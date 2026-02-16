@@ -18,6 +18,7 @@ __init__.py
 # ignore some IDE related files
 *.xcodeproj
 .vscode
+.ipynb_checkpoints
 
 #ignore mac specific file
 .DS_Store

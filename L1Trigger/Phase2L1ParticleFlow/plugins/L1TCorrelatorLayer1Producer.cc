@@ -1328,6 +1328,10 @@ std::unique_ptr<l1t::PFCandidateCollection> L1TCorrelatorLayer1Producer::fetchPF
       ret->back().setCaloEta(reg.floatGlbEtaOf(p));
       ret->back().setCaloPhi(reg.floatGlbPhiOf(p));
 
+      l1ct::PuppiObj encodedPF;
+      encodedPF.fill(reg, p);
+      ret->back().setEncodedPuppi64(encodedPF.pack().to_uint64());
+
       setRefs_(ret->back(), p);
     }
     for (const auto &p : event_.out[ir].pfneutral) {
@@ -1340,6 +1344,11 @@ std::unique_ptr<l1t::PFCandidateCollection> L1TCorrelatorLayer1Producer::fetchPF
       ret->back().setHwEmID(p.hwEmID);
       ret->back().setCaloEta(reg.floatGlbEtaOf(p));
       ret->back().setCaloPhi(reg.floatGlbPhiOf(p));
+
+      l1ct::PuppiObj encodedPF;
+      encodedPF.fill(reg, p, p.intPt(), 1);
+      ret->back().setEncodedPuppi64(encodedPF.pack().to_uint64());
+      
       setRefs_(ret->back(), p);
     }
   }
