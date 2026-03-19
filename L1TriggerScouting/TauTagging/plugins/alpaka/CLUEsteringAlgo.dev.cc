@@ -117,11 +117,11 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::l1sc::kernels {
 
     // wrap device buffers
     auto points_device =
-        clue::PointsDevice<kDims, Device>(queue, n_points, eta_coord_ptr, phi_coord_ptr, weights_ptr, clusters_ptr);
+        clue::PointsDevice<kDims, float, Device>(queue, n_points, eta_coord_ptr, phi_coord_ptr, weights_ptr, clusters_ptr);
     // run (wrap coords if enabled)
     auto clue_algo = clue::Clusterer<kDims>(queue, dc_, rhoc_, dm_);
-    if (wrap_coords_)
-      clue_algo.setWrappedCoordinates({{0, 1}});
+    // if (wrap_coords_)
+    //  clue_algo.setWrappedCoordinates({{0, 1}});
     clue_algo.make_clusters(queue, points_device);
     auto associator = clue_algo.getClusters(queue, points_device);
 
@@ -185,10 +185,10 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::l1sc::kernels {
 
       // wrap device buffers
       auto points_device =
-          clue::PointsDevice<kDims, Device>(queue, n_points, eta_coord_ptr, phi_coord_ptr, weights_ptr, clusters_ptr);
+          clue::PointsDevice<kDims, float, Device>(queue, n_points, eta_coord_ptr, phi_coord_ptr, weights_ptr, clusters_ptr);
       auto clue_algo = clue::Clusterer<kDims>(queue, dc_, rhoc_, dm_);
-      if (wrap_coords_)
-        clue_algo.setWrappedCoordinates({{0, 1}});
+      // if (wrap_coords_)
+      //   clue_algo.setWrappedCoordinates({{0, 1}});
       clue_algo.make_clusters(queue, points_device);
       auto associator = clue_algo.getClusters(queue, points_device);
 
