@@ -71,18 +71,37 @@ process.GlobalTag = GlobalTag(process.GlobalTag, '141X_mcRun4_realistic_v3', '')
 
 process.l1tTrackSelectionProducer.processSimulatedTracks = False # these would need stubs, and are not used anyway
 
-process.l1tEmulation = cms.Task(
+process.load('L1Trigger.Phase2L1ParticleFlow.l1ctLayer1_cff')
+process.load('L1Trigger.L1TTrackMatch.l1tGTTInputProducer_cfi')
+process.load('L1Trigger.L1TTrackMatch.l1tTrackSelectionProducer_cfi')
+process.load('L1Trigger.VertexFinder.l1tVertexProducer_cfi')
+from L1Trigger.Configuration.SimL1Emulator_cff import l1tSAMuonsGmt
+process.l1tSAMuonsGmt = l1tSAMuonsGmt.clone()
+from L1Trigger.L1CaloTrigger.l1tPhase2L1CaloEGammaEmulator_cfi import l1tPhase2L1CaloEGammaEmulator
+process.l1tPhase2L1CaloEGammaEmulator = l1tPhase2L1CaloEGammaEmulator.clone()
+from L1Trigger.L1CaloTrigger.l1tPhase2CaloPFClusterEmulator_cfi import l1tPhase2CaloPFClusterEmulator
+process.l1tPhase2CaloPFClusterEmulator = l1tPhase2CaloPFClusterEmulator.clone()
+from L1Trigger.L1CaloTrigger.l1tPhase2GCTBarrelToCorrelatorLayer1Emulator_cfi import l1tPhase2GCTBarrelToCorrelatorLayer1Emulator
+process.l1tPhase2GCTBarrelToCorrelatorLayer1Emulator = l1tPhase2GCTBarrelToCorrelatorLayer1Emulator.clone()
+
+process.L1TInputTask = cms.Task(
     process.l1tSAMuonsGmt,
     process.l1tPhase2L1CaloEGammaEmulator,
     process.l1tPhase2CaloPFClusterEmulator,
-    process.l1tPhase2GCTBarrelToCorrelatorLayer1Emulator,    
-    process.L1TLayer1TaskInputsTask,
-    process.L1TLayer1Task,
-    process.l1tLayer2EG,
-    process.L1TPFJetsEmulationTask,
-    process.L1TPFJetsExtendedTask,
-    process.L1TBJetsTask, 
+    process.l1tPhase2GCTBarrelToCorrelatorLayer1Emulator
 )
+process.runPF = cms.Path( 
+        process.l1tGTTInputProducer +
+        process.l1tTrackSelectionProducer +
+        process.l1tVertexFinderEmulator +
+        process.l1tLayer1BarrelExtended + 
+        process.l1tLayer1HGCalExtended +
+        process.l1tLayer1HGCalNoTK +
+        process.l1tLayer1HF +
+        process.l1tLayer1Extended 
+)
+process.runPF.associate(process.L1TLayer1TaskInputsTask)
+process.runPF.associate(process.L1TInputTask)
 
 # Pool source 
 process.source = cms.Source("PoolSource",
@@ -148,9 +167,6 @@ if step_mapper[options.pipelineStep] >= step_mapper["clustering"]:
 if step_mapper[options.pipelineStep] >= step_mapper["sorting"]:
     process.p_pipeline += process.softTaus
 
-# associate pipeline path to l1tEmulation task
-process.p_pipeline.associate(process.l1tEmulation)
-
 # define table path
 process.p_tables = cms.Path()
 
@@ -203,7 +219,7 @@ if "soft_tau_outputs" in dump:
 
 # output
 process.out = cms.OutputModule("NanoAODOutputModule",
-    fileName = cms.untracked.string("softTauNano.root"),
+    fileName = cms.untracked.string("msjCaseCNano_legacy.root"),
     SelectEvents = cms.untracked.PSet(SelectEvents = cms.vstring()),
     outputCommands = cms.untracked.vstring("drop *", "keep nanoaodFlatTable_*Table_*_*"),
     compressionLevel = cms.untracked.int32(4),
@@ -213,6 +229,7 @@ process.end = cms.EndPath(process.out)
 
 # schedule
 process.schedule = cms.Schedule(
+    process.runPF,
     process.p_pipeline, 
     process.p_tables,
     process.end

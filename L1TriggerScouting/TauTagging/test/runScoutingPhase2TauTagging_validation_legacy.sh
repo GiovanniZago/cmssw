@@ -4,7 +4,7 @@
 # example usage: bash L1TriggerScouting/Phase2/test/runScoutingPhase2HeterogeneousW3Pi.sh cuda 10 37
 function die { echo Failed $1: status $2 ; exit $2 ; }
 
-SCRIPT="L1TriggerScouting/TauTagging/test/runScoutingPhase2TauTagging_validation.py"
+SCRIPT="L1TriggerScouting/TauTagging/test/runScoutingPhase2TauTagging_validation_legacy.py"
 
 if [ "$#" != "3" ]; then
     die "Need exactly 3 arguments: 1st ('cpu', 'cpu-dump', 'cuda', 'cuda-dump', 'rocm'), 2nd ('num_events'), 3rd ('unpacking', 'clustering', 'sorting', 'reshaping', 'tagging') got $#" 1
