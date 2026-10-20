@@ -287,12 +287,12 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::l1sc::kernels {
                                   uint32_t nslices,
                                   PuppiDeviceCollection::View puppi,
                                   BxLookupDevice::ConstView bx_lookup) const {
-      for (int32_t idx : cms::alpakatools::uniform_elements(acc, static_cast<int32_t>(nslices))) {
-        const RawSlice slice = slices[idx];
+      for (int32_t slice_idx : cms::alpakatools::independent_groups(acc, static_cast<int32_t>(nslices))) {
+        const RawSlice slice = slices[slice_idx];
         const data_t* w = words + slice.word_offset;
         const uint32_t base = bx_lookup.offset().offset()[slice.bx_row] + slice.within_bx_offset;
-        for (uint32_t i = 0; i < slice.count; ++i) {
-          store_puppi(puppi, base + i, w[i]);  // one object per 64-bit word
+        for (int32_t word_idx : cms::alpakatools::independent_group_elements(acc, slice.count)) {
+          store_puppi(puppi, base + word_idx, w[word_idx]);  // one object per 64-bit word
         }
       }
     }
@@ -304,7 +304,7 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::l1sc::kernels {
                           uint32_t nbx,
                           BxLookupDevice& bx_lookup,
                           BxLookupDevice& bx_sizes) {
-    const uint32_t threads_per_block = 512;
+    const uint32_t threads_per_block = 1024; // can be tuned for performance
     const auto grid = cms::alpakatools::make_workdiv<Acc1D>(cms::alpakatools::divide_up_by(nbx, threads_per_block),
                                                             threads_per_block);
     alpaka::exec<Acc1D>(queue, grid, FillPuppiLookupsKernel{}, bx_arr, cnt_arr, nbx, bx_lookup.view(), bx_sizes.view());
@@ -317,7 +317,7 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::l1sc::kernels {
                             PuppiDeviceCollection& puppi,
                             const BxLookupDevice& bx_lookup) {
     // one thread per payload slice; slices are short (O(hundred) objects), so per-thread loops stay cheap
-    const uint32_t threads_per_block = 512;
+    const uint32_t threads_per_block = 256; // can be tuned for performance
     const auto grid = cms::alpakatools::make_workdiv<Acc1D>(cms::alpakatools::divide_up_by(nslices, threads_per_block),
                                                             threads_per_block);
     alpaka::exec<Acc1D>(

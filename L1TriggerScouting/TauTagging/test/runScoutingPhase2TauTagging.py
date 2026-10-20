@@ -4,6 +4,14 @@ process = cms.Process("ScoutingPhase2TauTagging")
 # import TauTagging options
 from L1TriggerScouting.TauTagging.options_cff import options, VarParsing
 
+# tracing option
+options.register ("tracePerfetto",
+    False,
+    VarParsing.VarParsing.multiplicity.singleton,
+    VarParsing.VarParsing.varType.bool, 
+    "Generate trace with Perfetto"
+)
+
 # parse arguments
 options.parseArguments()
 
@@ -145,13 +153,17 @@ if "soft_tau_inputs" in dump:
 if "soft_tau_outputs" in dump:
     process.p_tables += process.softTauOutputsOrbitTable
 
-# output
+# define endpath
+process.end = cms.EndPath()
+
 process.out = cms.OutputModule("OrbitNanoAODOutputModule",
     fileName = cms.untracked.string("softTauOrbitNano-L1PF_17_0_X_on_pre2-17_0_X-new-unpacker.root"),
     SelectEvents = cms.untracked.PSet(SelectEvents = cms.vstring()),
     outputCommands = cms.untracked.vstring("drop *", "keep l1ScoutingRun3OrbitFlatTable_*_*_*"),
 )
-process.end = cms.EndPath(process.out)
+
+if dump:
+    process.end += process.out
 
 # schedule
 process.schedule = cms.Schedule(
@@ -161,9 +173,10 @@ process.schedule = cms.Schedule(
 )
 
 # tracing with Perfetto
-from PerfTools.Perfetto.customisePerfetto import customisePerfetto
-customisePerfetto(process,
-              fileName="tau_tagging_nomemcpy.pftrace",
-              traceFunctions=True,
-              traceGpuKernels=True,
-              traceAllocations=True)
+if options.tracePerfetto:
+    from PerfTools.Perfetto.customisePerfetto import customisePerfetto
+    customisePerfetto(process,
+                fileName="trace.pftrace",
+                traceFunctions=True,
+                traceGpuKernels=True,
+                traceAllocations=True)
