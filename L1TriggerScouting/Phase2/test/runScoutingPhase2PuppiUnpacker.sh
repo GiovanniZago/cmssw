@@ -8,7 +8,7 @@ SCRIPT="L1TriggerScouting/Phase2/test/runScoutingPhase2PuppiUnpacker.py"
 DATA="/mnt/ramdisk/gizago/raw"
 
 if [ "$#" != "4" ]; then
-    die "Need exactly 3 arguments: 1st ('cpu', 'cuda', or 'rocm'), 2nd ('num_events'), 3rd ('run_number'), 4th ('legacy', 'alpaka') got $#" 1
+    die "Need exactly 3 arguments: 1st ('cpu', 'cuda', or 'rocm'), 2nd ('num_events'), 3rd ('run_number'), 4th ('legacy', 'alpaka', 'alpaka-v2') got $#" 1
 fi
 if [[ "$1" =~ ^(cpu|cuda)$ ]]; then
     TARGET=$1
