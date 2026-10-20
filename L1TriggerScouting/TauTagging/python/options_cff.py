@@ -24,7 +24,7 @@ options.register ("model",
 )
 
 options.register ("batchSize", 
-    8192, 
+    2048, 
     VarParsing.VarParsing.multiplicity.singleton, 
     VarParsing.VarParsing.varType.int, 
     "Batch size (in terms of clusters) for model inference."
