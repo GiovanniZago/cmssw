@@ -16,54 +16,59 @@
 
 namespace ALPAKA_ACCELERATOR_NAMESPACE::torchtest {
 
-  class TinyResNet : public stream::FixedQueueEDProducer<> {
-  public:
-    TinyResNet(const edm::ParameterSet &params)
-        : FixedQueueEDProducer<>(params),
-          images_token_(consumes(params.getParameter<edm::InputTag>("images"))),
-          logits_token_{produces()},
-          model_(params.getParameter<edm::FileInPath>("model").fullPath()),
-          environment_{static_cast<::torchtest::Environment>(params.getUntrackedParameter<int>("environment"))} {}
+class TinyResNet : public stream::FixedQueueEDProducer<> {
+ public:
+  TinyResNet(const edm::ParameterSet& params)
+      : FixedQueueEDProducer<>(params),
+        images_token_(consumes(params.getParameter<edm::InputTag>("images"))),
+        logits_token_{produces()},
+        model_(params.getParameter<edm::FileInPath>("model").fullPath()),
+        environment_{static_cast<::torchtest::Environment>(
+            params.getUntrackedParameter<int>("environment"))} {}
 
-    static void fillDescriptions(edm::ConfigurationDescriptions &descriptions) {
-      edm::ParameterSetDescription desc;
-      desc.add<edm::FileInPath>("model");
-      desc.add<edm::InputTag>("images");
-      desc.addUntracked<int>("environment", static_cast<int>(::torchtest::Environment::kProduction));
-      descriptions.addWithDefaultLabel(desc);
-    }
+  static void fillDescriptions(edm::ConfigurationDescriptions& descriptions) {
+    edm::ParameterSetDescription desc;
+    desc.add<edm::FileInPath>("model");
+    desc.add<edm::InputTag>("images");
+    desc.addUntracked<int>(
+        "environment", static_cast<int>(::torchtest::Environment::kProduction));
+    descriptions.addWithDefaultLabel(desc);
+  }
 
-    void produce(device::Event &event, const device::EventSetup &event_setup) override {
-      // in/out collections
-      const auto &images = event.get(images_token_);
-      const auto total_size = images.const_view().metadata().size();
-      auto logits = portabletest::LogitsDeviceCollection(event.queue(), total_size);
+  void produce(device::Event& event,
+               const device::EventSetup& event_setup) override {
+    // in/out collections
+    const auto& images = event.get(images_token_);
+    const auto total_size = images.const_view().metadata().size();
+    auto logits =
+        portabletest::LogitsDeviceCollection(event.queue(), total_size);
 
-      // records
-      auto input_records = images.const_view().records();
-      auto output_records = logits.view().records();
-      // input tensor definition
-      cms::torch::alpakatools::TensorCollection<Queue> inputs;
-      inputs.add<portabletest::ImageSoA>("images", input_records.r(), input_records.g(), input_records.b());
-      // output tensor definition
-      cms::torch::alpakatools::TensorCollection<Queue> outputs;
-      outputs.add<portabletest::LogitsSoA>("logits", output_records.logits());
+    // records
+    auto input_records = images.const_view().records();
+    auto output_records = logits.view().records();
+    // input tensor definition
+    cms::torch::alpakatools::TensorCollection<Queue> inputs;
+    inputs.add<portabletest::ImageSoA>("images", input_records.r(),
+                                       input_records.g(), input_records.b());
+    // output tensor definition
+    cms::torch::alpakatools::TensorCollection<Queue> outputs;
+    outputs.add<portabletest::LogitsSoA>("logits", output_records.logits());
 
-      model_.forward(event.queue(), inputs, outputs);
+    model_.forward(event.queue(), inputs, outputs);
 
-      // put device-side product into event
-      event.emplace(logits_token_, std::move(logits));
-    }
+    // put device-side product into event
+    event.emplace(logits_token_, std::move(logits));
+  }
 
-  private:
-    // event query tokens
-    const device::EDGetToken<portabletest::ImageDeviceCollection> images_token_;
-    const device::EDPutToken<portabletest::LogitsDeviceCollection> logits_token_;
-    // model
-    torch::AlpakaModel model_;
-    // debug mode flag
-    const ::torchtest::Environment environment_;
-  };
+ private:
+  // event query tokens
+  const device::EDGetToken<portabletest::ImageDeviceCollection> images_token_;
+  const device::EDPutToken<portabletest::LogitsDeviceCollection> logits_token_;
+  // model
+  torch::AlpakaModel model_;
+  // debug mode flag
+  const ::torchtest::Environment environment_;
+};
 
 }  // namespace ALPAKA_ACCELERATOR_NAMESPACE::torchtest
 

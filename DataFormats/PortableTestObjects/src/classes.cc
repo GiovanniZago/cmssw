@@ -1,15 +1,14 @@
 #include "DataFormats/Portable/interface/PortableHostCollectionReadRules.h"
 #include "DataFormats/Portable/interface/PortableHostObjectReadRules.h"
-#include "DataFormats/PortableTestObjects/interface/TestHostCollection.h"
-#include "DataFormats/PortableTestObjects/interface/TestHostObject.h"
-
-#include "DataFormats/PortableTestObjects/interface/ParticleHostCollection.h"
 #include "DataFormats/PortableTestObjects/interface/HitHostCollection.h"
 #include "DataFormats/PortableTestObjects/interface/ImageHostCollection.h"
 #include "DataFormats/PortableTestObjects/interface/LogitsHostCollection.h"
-#include "DataFormats/PortableTestObjects/interface/SimpleNetHostCollection.h"
-#include "DataFormats/PortableTestObjects/interface/MultiHeadNetHostCollection.h"
 #include "DataFormats/PortableTestObjects/interface/MaskHostCollection.h"
+#include "DataFormats/PortableTestObjects/interface/MultiHeadNetHostCollection.h"
+#include "DataFormats/PortableTestObjects/interface/ParticleHostCollection.h"
+#include "DataFormats/PortableTestObjects/interface/SimpleNetHostCollection.h"
+#include "DataFormats/PortableTestObjects/interface/TestHostCollection.h"
+#include "DataFormats/PortableTestObjects/interface/TestHostObject.h"
 
 SET_PORTABLEHOSTCOLLECTION_READ_RULES(portabletest::TestHostCollection);
 SET_PORTABLEHOSTCOLLECTION_READ_RULES(portabletest::TestHostCollection2);

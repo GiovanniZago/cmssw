@@ -1,21 +1,21 @@
 #ifndef L1TriggerScouting_TauTagging_plugins_alpaka_TransformKernel_h
 #define L1TriggerScouting_TauTagging_plugins_alpaka_TransformKernel_h
 
-#include <alpaka/alpaka.hpp>
+#include <fmt/core.h>
 
+#include <alpaka/alpaka.hpp>
 #include <cstdio>
 #include <limits>
-#include <fmt/core.h> 
 
-#include "DataFormats/Portable/interface/PortableHostCollection.h"
-#include "DataFormats/Portable/interface/PortableHostObject.h"
-#include "DataFormats/Portable/interface/alpaka/PortableObject.h"
-#include "DataFormats/Portable/interface/alpaka/PortableCollection.h"
-#include "DataFormats/L1ScoutingSoA/interface/alpaka/SoftTauDeviceTensor.h"
 #include "DataFormats/L1ScoutingSoA/interface/alpaka/AssociationMapDevice.h"
 #include "DataFormats/L1ScoutingSoA/interface/alpaka/BxLookupDevice.h"
 #include "DataFormats/L1ScoutingSoA/interface/alpaka/ClustersDeviceCollection.h"
 #include "DataFormats/L1ScoutingSoA/interface/alpaka/PFCandidateDeviceCollection.h"
+#include "DataFormats/L1ScoutingSoA/interface/alpaka/SoftTauDeviceTensor.h"
+#include "DataFormats/Portable/interface/PortableHostCollection.h"
+#include "DataFormats/Portable/interface/PortableHostObject.h"
+#include "DataFormats/Portable/interface/alpaka/PortableCollection.h"
+#include "DataFormats/Portable/interface/alpaka/PortableObject.h"
 #include "HeterogeneousCore/AlpakaInterface/interface/config.h"
 
 // #define __DEBUG__
@@ -25,33 +25,33 @@
 // and not meant to be stored in the FW event struct
 namespace l1sc {
 
-  struct PortableCounter {
-    int value;
-  };
-  using CounterHost = PortableHostObject<PortableCounter>;
+struct PortableCounter {
+  int value;
+};
+using CounterHost = PortableHostObject<PortableCounter>;
 
 }  // namespace l1sc
 
 namespace ALPAKA_ACCELERATOR_NAMESPACE::l1sc {
 
-  using namespace ::l1sc;
-  using CounterDevice = PortableObject<PortableCounter>;
+using namespace ::l1sc;
+using CounterDevice = PortableObject<PortableCounter>;
 
 }  // namespace ALPAKA_ACCELERATOR_NAMESPACE::l1sc
 
 namespace ALPAKA_ACCELERATOR_NAMESPACE::l1sc::kernels {
 
-  using namespace ::l1sc;
+using namespace ::l1sc;
 
-  AssociationMapDevice sortClustersCandsMap(Queue& queue,
-                            const PFCandidateDeviceCollection& pf,
-                            const BxLookupDevice& bxClustersMap,
-                            const AssociationMapDevice& clusterCandsMap, 
-                            const ClustersDeviceCollection& clusters);
+AssociationMapDevice sortClustersCandsMap(
+    Queue& queue, const PFCandidateDeviceCollection& pf,
+    const BxLookupDevice& bxClustersMap,
+    const AssociationMapDevice& clusterCandsMap,
+    const ClustersDeviceCollection& clusters);
 
-  SoftTauInputDeviceTensor transform(Queue& queue, 
-                 const PFCandidateDeviceCollection& pf, 
-                 const AssociationMapDevice& clusterCandsMap);
+SoftTauInputDeviceTensor transform(Queue& queue,
+                                   const PFCandidateDeviceCollection& pf,
+                                   const AssociationMapDevice& clusterCandsMap);
 }  // namespace ALPAKA_ACCELERATOR_NAMESPACE::l1sc::kernels
 
 #endif  // L1TriggerScouting_TauTagging_plugins_alpaka_TransformKernel_h

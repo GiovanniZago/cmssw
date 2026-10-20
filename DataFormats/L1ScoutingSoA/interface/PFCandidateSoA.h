@@ -5,8 +5,8 @@
 
 namespace l1sc {
 
-  // alias to simplify the logic and intuition what is the base for analysis
-  using PFCandidateSoA = PuppiLayout<>;
+// alias to simplify the logic and intuition what is the base for analysis
+using PFCandidateSoA = PuppiLayout<>;
 
 }  // namespace l1sc
 

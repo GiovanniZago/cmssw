@@ -1,37 +1,35 @@
-#include "FWCore/Framework/interface/MakerMacros.h"
-
+#include <cmath>
 #include <fstream>
 #include <iomanip>
 #include <memory>
 #include <string>
-#include <cmath>
 
-#include "FWCore/Framework/interface/global/EDProducer.h"
+#include "DataFormats/L1ScoutingSoA/interface/BxLookupHost.h"
+#include "DataFormats/L1ScoutingSoA/interface/ClustersHostCollection.h"
+#include "DataFormats/NanoAOD/interface/OrbitFlatTable.h"
 #include "FWCore/Framework/interface/Event.h"
+#include "FWCore/Framework/interface/EventSetup.h"
+#include "FWCore/Framework/interface/Frameworkfwd.h"
+#include "FWCore/Framework/interface/MakerMacros.h"
+#include "FWCore/Framework/interface/global/EDProducer.h"
+#include "FWCore/MessageLogger/interface/MessageDrop.h"
+#include "FWCore/MessageLogger/interface/MessageLogger.h"
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
 #include "FWCore/Utilities/interface/EDGetToken.h"
 #include "FWCore/Utilities/interface/InputTag.h"
-#include "FWCore/Framework/interface/EventSetup.h"
-#include "FWCore/Framework/interface/Frameworkfwd.h"
-#include "FWCore/MessageLogger/interface/MessageLogger.h"
-#include "FWCore/MessageLogger/interface/MessageDrop.h"
-
-#include "DataFormats/NanoAOD/interface/OrbitFlatTable.h"
-#include "DataFormats/L1ScoutingSoA/interface/BxLookupHost.h"
-#include "DataFormats/L1ScoutingSoA/interface/ClustersHostCollection.h"
-
 
 class ClusterSoAToOrbitFlatTable : public edm::global::EDProducer<> {
-public:
+ public:
   // constructor and destructor
   explicit ClusterSoAToOrbitFlatTable(const edm::ParameterSet&);
   ~ClusterSoAToOrbitFlatTable() override {};
 
-  void produce(edm::StreamID, edm::Event&, edm::EventSetup const&) const override;
+  void produce(edm::StreamID, edm::Event&,
+               edm::EventSetup const&) const override;
 
   static void fillDescriptions(edm::ConfigurationDescriptions& descriptions);
 
-private:
+ private:
   // the tokens to access the data
   edm::EDGetTokenT<l1sc::BxLookupHost> srcBx_;
   edm::EDGetTokenT<l1sc::ClustersHostCollection> srcClusters_;
@@ -43,50 +41,60 @@ private:
 
 // -------------------------------- constructor  -------------------------------
 
-ClusterSoAToOrbitFlatTable::ClusterSoAToOrbitFlatTable(const edm::ParameterSet& iConfig)
-    : srcBx_(consumes<l1sc::BxLookupHost>(iConfig.getParameter<edm::InputTag>("srcBx"))),
-      srcClusters_(consumes<l1sc::ClustersHostCollection>(iConfig.getParameter<edm::InputTag>("srcClusters"))),
+ClusterSoAToOrbitFlatTable::ClusterSoAToOrbitFlatTable(
+    const edm::ParameterSet& iConfig)
+    : srcBx_(consumes<l1sc::BxLookupHost>(
+          iConfig.getParameter<edm::InputTag>("srcBx"))),
+      srcClusters_(consumes<l1sc::ClustersHostCollection>(
+          iConfig.getParameter<edm::InputTag>("srcClusters"))),
       clustering_name_(iConfig.getParameter<std::string>("clustering_name")),
       name_(iConfig.getParameter<std::string>("name")),
-      doc_(iConfig.getParameter<std::string>("doc")), 
+      doc_(iConfig.getParameter<std::string>("doc")),
       extension_(iConfig.getParameter<bool>("extension")) {
   produces<l1ScoutingRun3::OrbitFlatTable>();
 }
 // -----------------------------------------------------------------------------
 
 // ----------------------- method called for each orbit  -----------------------
-void ClusterSoAToOrbitFlatTable::produce(edm::StreamID, edm::Event& iEvent, edm::EventSetup const&) const {
+void ClusterSoAToOrbitFlatTable::produce(edm::StreamID, edm::Event& iEvent,
+                                         edm::EventSetup const&) const {
   edm::Handle<l1sc::BxLookupHost> srcBx;
   iEvent.getByToken(srcBx_, srcBx);
   edm::Handle<l1sc::ClustersHostCollection> srcClusters;
   iEvent.getByToken(srcClusters_, srcClusters);
 
   // get offsets
-  const auto *bx_offsets = srcBx->const_view().offset().offset().data();
-  const unsigned int nbx = srcBx->const_view().bx().metadata().size(); // ATTENTION here
+  const auto* bx_offsets = srcBx->const_view().offset().offset().data();
+  const unsigned int nbx =
+      srcBx->const_view().bx().metadata().size();  // ATTENTION here
   std::vector<unsigned int> bxOffsets;
   bxOffsets.push_back(0);
-  bxOffsets.insert(bxOffsets.end(), bx_offsets, bx_offsets + nbx + 1); // ATTENTION here
-  
+  bxOffsets.insert(bxOffsets.end(), bx_offsets,
+                   bx_offsets + nbx + 1);  // ATTENTION here
+
   // get number of clusters
   const unsigned int ncands = srcClusters->const_view().metadata().size();
-  
+
   // get cluster indexes
-  const auto *cluster = srcClusters->const_view().cluster().data();
+  const auto* cluster = srcClusters->const_view().cluster().data();
   std::vector<int32_t> clusters{cluster, cluster + ncands};
 
   // get is_seed info
-  const auto *is_seed = srcClusters->const_view().is_seed().data();
+  const auto* is_seed = srcClusters->const_view().is_seed().data();
   std::vector<int32_t> is_seeds{is_seed, is_seed + ncands};
 
-  auto out = std::make_unique<l1ScoutingRun3::OrbitFlatTable>(bxOffsets, name_, /* singleton */ false,  /* extension */ extension_);
+  auto out = std::make_unique<l1ScoutingRun3::OrbitFlatTable>(
+      bxOffsets, name_, /* singleton */ false, /* extension */ extension_);
   out->setDoc(doc_);
-  out->addColumn<int32_t>("clusterIndex" + clustering_name_, clusters, "associated cluster index for " + clustering_name_);
-  out->addColumn<int32_t>("isSeed" + clustering_name_, is_seeds, "cluster used as seed for " + clustering_name_);
+  out->addColumn<int32_t>("clusterIndex" + clustering_name_, clusters,
+                          "associated cluster index for " + clustering_name_);
+  out->addColumn<int32_t>("isSeed" + clustering_name_, is_seeds,
+                          "cluster used as seed for " + clustering_name_);
   iEvent.put(std::move(out));
 }
 
-void ClusterSoAToOrbitFlatTable::fillDescriptions(edm::ConfigurationDescriptions& descriptions) {
+void ClusterSoAToOrbitFlatTable::fillDescriptions(
+    edm::ConfigurationDescriptions& descriptions) {
   edm::ParameterSetDescription desc;
   desc.add<edm::InputTag>("srcBx");
   desc.add<edm::InputTag>("srcClusters");

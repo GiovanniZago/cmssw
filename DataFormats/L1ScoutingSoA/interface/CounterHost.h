@@ -5,7 +5,7 @@
 
 namespace l1sc {
 
-  using CounterHost = PortableHostObject<unsigned int>;
+using CounterHost = PortableHostObject<unsigned int>;
 
 }  // namespace l1sc
 

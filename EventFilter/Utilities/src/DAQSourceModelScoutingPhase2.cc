@@ -1,15 +1,15 @@
-#include "EventFilter/Utilities/interface/DAQSourceModelsScoutingPhase2.h"
 #include <iostream>
+
+#include "EventFilter/Utilities/interface/DAQSourceModelsScoutingPhase2.h"
 using namespace edm::streamer;
 
-void DataModeScoutingPhase2::makeDirectoryEntries(std::vector<std::string> const& baseDirs,
-                                                  std::vector<int> const& numSources,
-                                                  std::vector<int> const& sourceIDs,
-                                                  std::string const& sourceIdentifier,
-                                                  std::string const& runDir) {
-  std::cout << "makeDirectoryEntries called with runDir " << runDir << ",\n baseDirs = {\n";
-  for (auto& b : baseDirs)
-    std::cout << "   " << b << ",\n";
+void DataModeScoutingPhase2::makeDirectoryEntries(
+    std::vector<std::string> const& baseDirs,
+    std::vector<int> const& numSources, std::vector<int> const& sourceIDs,
+    std::string const& sourceIdentifier, std::string const& runDir) {
+  std::cout << "makeDirectoryEntries called with runDir " << runDir
+            << ",\n baseDirs = {\n";
+  for (auto& b : baseDirs) std::cout << "   " << b << ",\n";
   std::cout << "}\n";
   std::filesystem::path runDirP(runDir);
   for (auto& baseDir : baseDirs) {
@@ -17,18 +17,19 @@ void DataModeScoutingPhase2::makeDirectoryEntries(std::vector<std::string> const
     buPaths_.emplace_back(baseDirP / runDirP);
   }
   std::cout << ", numSources = { \n";
-  for (auto& n : numSources)
-    std::cout << "   " << n << ",\n";
+  for (auto& n : numSources) std::cout << "   " << n << ",\n";
   std::cout << "}\n";
   std::cout << std::endl;
 
   // store the number of sources in each BU
   buNumSources_ = numSources;
-  totalNumSources_ = std::accumulate(numSources.begin(), numSources.begin() + baseDirs.size(), 0u);
+  totalNumSources_ = std::accumulate(numSources.begin(),
+                                     numSources.begin() + baseDirs.size(), 0u);
 }
 
-std::pair<bool, std::vector<std::string>> DataModeScoutingPhase2::defineAdditionalFiles(std::string const& primaryName,
-                                                                                        bool fileListMode) const {
+std::pair<bool, std::vector<std::string>>
+DataModeScoutingPhase2::defineAdditionalFiles(std::string const& primaryName,
+                                              bool fileListMode) const {
   std::vector<std::string> additionalFiles;
   assert(!buNumSources_.empty());
   auto fullpath = std::filesystem::path(primaryName);
@@ -38,19 +39,18 @@ std::pair<bool, std::vector<std::string>> DataModeScoutingPhase2::defineAddition
   std::string pre = fullstr.substr(0, pos + 7), post = fullstr.substr(pos + 9);
   char buff[3];
   unsigned int istream = 0;
-  //std::string files = primaryName;
+  // std::string files = primaryName;
   for (unsigned int i = 0, n = buPaths_.size(); i < n; ++i) {
     for (unsigned int j = 0, nj = buNumSources_[i]; j < nj; ++j, ++istream) {
-      if (istream == 0)
-        continue;  // this is the main file
+      if (istream == 0) continue;  // this is the main file
       snprintf(buff, sizeof(buff), "%02u", istream);
       auto path = buPaths_[i] / (pre + std::string(buff) + post);
       additionalFiles.push_back(path.generic_string());
-      //files += ", " + path.generic_string();
+      // files += ", " + path.generic_string();
     }
   }
   assert(istream == totalNumSources_);
-  //std::cout << "Will open " << files << std::endl;
+  // std::cout << "Will open " << files << std::endl;
   return std::make_pair(true, additionalFiles);
 }
 
@@ -66,44 +66,52 @@ void DataModeScoutingPhase2::readEvent(edm::EventPrincipal& eventPrincipal) {
 
   // set provenance helpers
   uint32_t hdrEventID = currOrbit_;
-  edm::EventID eventID = edm::EventID(daqSource_->eventRunNumber(), daqSource_->currentLumiSection(), hdrEventID);
-  edm::EventAuxiliary aux(
-      eventID, daqSource_->processGUID(), tstamp, events_[0]->isRealData(), edm::EventAuxiliary::PhysicsTrigger);
+  edm::EventID eventID =
+      edm::EventID(daqSource_->eventRunNumber(),
+                   daqSource_->currentLumiSection(), hdrEventID);
+  edm::EventAuxiliary aux(eventID, daqSource_->processGUID(), tstamp,
+                          events_[0]->isRealData(),
+                          edm::EventAuxiliary::PhysicsTrigger);
 
   aux.setProcessHistoryID(daqSource_->processHistoryID());
   daqSource_->makeEventWrapper(eventPrincipal, aux);
 
   // create scouting raw data collection
-  //std::cout << "Called here with " << events_.size() << " events" << std::endl;
+  // std::cout << "Called here with " << events_.size() << " events" <<
+  // std::endl;
   std::unique_ptr<SDSRawDataCollection> rawData(new SDSRawDataCollection);
   for (unsigned int id = 0, n = events_.size(); id < n; ++id) {
     const auto& e = *events_[id];
     auto size = e.eventSize();
-    //std::cout << "Event " << id << " of size " << size << " payload at " << (void*)(e.payload()) << std::endl;
+    // std::cout << "Event " << id << " of size " << size << " payload at " <<
+    // (void*)(e.payload()) << std::endl;
     auto& fedData = rawData->FEDData(id);
     fedData.resize(size);
     memcpy(fedData.data(), e.payload(), size);
   }
 
-  std::unique_ptr<edm::WrapperBase> edp(new edm::Wrapper<SDSRawDataCollection>(std::move(rawData)));
-  eventPrincipal.put(
-      daqProvenanceHelpers_[0]->productDescription(), std::move(edp), daqProvenanceHelpers_[0]->dummyProvenance());
+  std::unique_ptr<edm::WrapperBase> edp(
+      new edm::Wrapper<SDSRawDataCollection>(std::move(rawData)));
+  eventPrincipal.put(daqProvenanceHelpers_[0]->productDescription(),
+                     std::move(edp),
+                     daqProvenanceHelpers_[0]->dummyProvenance());
 
   eventCached_ = false;
 }
 
-std::vector<std::shared_ptr<const edm::DaqProvenanceHelper>>& DataModeScoutingPhase2::makeDaqProvenanceHelpers() {
-  //set FRD data collection
+std::vector<std::shared_ptr<const edm::DaqProvenanceHelper>>&
+DataModeScoutingPhase2::makeDaqProvenanceHelpers() {
+  // set FRD data collection
   daqProvenanceHelpers_.clear();
   daqProvenanceHelpers_.emplace_back(
-      std::make_shared<const edm::DaqProvenanceHelper>(edm::TypeID(typeid(SDSRawDataCollection)), "DAQSource"));
+      std::make_shared<const edm::DaqProvenanceHelper>(
+          edm::TypeID(typeid(SDSRawDataCollection)), "DAQSource"));
   return daqProvenanceHelpers_;
 }
 
 bool DataModeScoutingPhase2::nextEventView(RawInputFile*) {
   blockCompleted_ = false;
-  if (eventCached_)
-    return true;
+  if (eventCached_) return true;
 
   // move the data block address only for the sources processed
   // un the previous event by adding the last event size
@@ -125,7 +133,8 @@ bool DataModeScoutingPhase2::makeEvents() {
   // check if one dataBlock terminated earlier than others.
   for (int i = 0; i < numFiles_; i++) {
     /*
-    std::cout << " i = " << i << ", dataBlockAddrs_[i] = " << (void*)(dataBlockAddrs_[i])
+    std::cout << " i = " << i << ", dataBlockAddrs_[i] = " <<
+    (void*)(dataBlockAddrs_[i])
               << ", dataBlockMaxAddrs_[i] = " << (void*)(dataBlockMaxAddrs_[i])
               << ", blockCompleted_ = " << blockCompleted_ << std::endl;
     */
@@ -137,14 +146,18 @@ bool DataModeScoutingPhase2::makeEvents() {
     // event contains data, add it to the events list
     events_.emplace_back(std::make_unique<FRDEventMsgView>(dataBlockAddrs_[i]));
     /*
-    std::cout << "Emplaced event " << i << " (check: " << (events_.size() - 1) << ") of size " << events_[i]->size()
-              << " eventSize " << events_[i]->eventSize() << ", payload at " << (void*)(events_[i]->payload())
+    std::cout << "Emplaced event " << i << " (check: " << (events_.size() - 1)
+    << ") of size " << events_[i]->size()
+              << " eventSize " << events_[i]->eventSize() << ", payload at " <<
+    (void*)(events_[i]->payload())
               << ", event id:" << events_[i]->event() << std::endl;
     */
     if (dataBlockAddrs_[i] + events_.back()->size() > dataBlockMaxAddrs_[i])
       throw cms::Exception("DAQSource::getNextEvent")
-          << " event id:" << events_.back()->event() << " lumi:" << events_.back()->lumi()
-          << " run:" << events_.back()->run() << " of size:" << events_.back()->size()
+          << " event id:" << events_.back()->event()
+          << " lumi:" << events_.back()->lumi()
+          << " run:" << events_.back()->run()
+          << " of size:" << events_.back()->size()
           << " bytes does not fit into the buffer or has corrupted header";
 
     // find the minimum orbit for the current event between all files
@@ -184,4 +197,6 @@ bool DataModeScoutingPhase2::makeEvents() {
 
 bool DataModeScoutingPhase2::checksumValid() { return true; }
 
-std::string DataModeScoutingPhase2::getChecksumError() const { return std::string(); }
+std::string DataModeScoutingPhase2::getChecksumError() const {
+  return std::string();
+}

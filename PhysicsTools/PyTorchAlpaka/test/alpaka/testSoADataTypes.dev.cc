@@ -1,7 +1,8 @@
-#include <alpaka/alpaka.hpp>
 #include <cppunit/extensions/HelperMacros.h>
+
 #include <Eigen/Core>
 #include <Eigen/Dense>
+#include <alpaka/alpaka.hpp>
 
 #include "DataFormats/Portable/interface/PortableCollection.h"
 #include "DataFormats/Portable/interface/PortableHostCollection.h"
@@ -14,336 +15,378 @@
 
 namespace ALPAKA_ACCELERATOR_NAMESPACE::torchtest {
 
-  class TestSOADataTypesAlpaka : public CppUnit::TestFixture {
-    CPPUNIT_TEST_SUITE(TestSOADataTypesAlpaka);
-    CPPUNIT_TEST(testInterface);
-    CPPUNIT_TEST(testMultiOutput);
-    CPPUNIT_TEST(testSingleElement);
-    CPPUNIT_TEST(testNoElement);
-    CPPUNIT_TEST(testEmptyMetadata);
-    CPPUNIT_TEST_SUITE_END();
+class TestSOADataTypesAlpaka : public CppUnit::TestFixture {
+  CPPUNIT_TEST_SUITE(TestSOADataTypesAlpaka);
+  CPPUNIT_TEST(testInterface);
+  CPPUNIT_TEST(testMultiOutput);
+  CPPUNIT_TEST(testSingleElement);
+  CPPUNIT_TEST(testNoElement);
+  CPPUNIT_TEST(testEmptyMetadata);
+  CPPUNIT_TEST_SUITE_END();
 
-  public:
-    void testInterface();
-    void testMultiOutput();
-    void testSingleElement();
-    void testNoElement();
-    void testEmptyMetadata();
-  };
+ public:
+  void testInterface();
+  void testMultiOutput();
+  void testSingleElement();
+  void testNoElement();
+  void testEmptyMetadata();
+};
 
-  CPPUNIT_TEST_SUITE_REGISTRATION(TestSOADataTypesAlpaka);
+CPPUNIT_TEST_SUITE_REGISTRATION(TestSOADataTypesAlpaka);
 
-  GENERATE_SOA_LAYOUT(SoATemplate,
-                      SOA_EIGEN_COLUMN(Eigen::Vector3d, a),
-                      SOA_EIGEN_COLUMN(Eigen::Vector3d, b),
+GENERATE_SOA_LAYOUT(SoATemplate, SOA_EIGEN_COLUMN(Eigen::Vector3d, a),
+                    SOA_EIGEN_COLUMN(Eigen::Vector3d, b),
 
-                      SOA_EIGEN_COLUMN(Eigen::Matrix2f, c),
+                    SOA_EIGEN_COLUMN(Eigen::Matrix2f, c),
 
-                      SOA_COLUMN(double, x),
-                      SOA_COLUMN(double, y),
-                      SOA_COLUMN(double, z),
+                    SOA_COLUMN(double, x), SOA_COLUMN(double, y),
+                    SOA_COLUMN(double, z),
 
-                      SOA_SCALAR(float, type),
-                      SOA_SCALAR(int, someNumber),
+                    SOA_SCALAR(float, type), SOA_SCALAR(int, someNumber),
 
-                      SOA_COLUMN(double, v),
-                      SOA_COLUMN(double, w));
+                    SOA_COLUMN(double, v), SOA_COLUMN(double, w));
 
-  using SoA = SoATemplate<>;
-  using SoAView = SoA::View;
-  using SoACollection = PortableCollection<Device, SoA>;
-  using SoACollectionView = PortableCollection<Device, SoA>::View;
-  using SoAHostCollection = PortableHostCollection<SoA>;
-  using SoAHostCollectionView = PortableHostCollection<SoA>::View;
+using SoA = SoATemplate<>;
+using SoAView = SoA::View;
+using SoACollection = PortableCollection<Device, SoA>;
+using SoACollectionView = PortableCollection<Device, SoA>::View;
+using SoAHostCollection = PortableHostCollection<SoA>;
+using SoAHostCollectionView = PortableHostCollection<SoA>::View;
 
-  constexpr auto tol = 1.0e-5;
+constexpr auto tol = 1.0e-5;
 
-  class FillKernel {
-  public:
-    template <alpaka::concepts::Acc TAcc>
-    ALPAKA_FN_ACC void operator()(TAcc const& acc, SoACollectionView view) const {
-      if (cms::alpakatools::once_per_grid(acc)) {
-        view.type() = 4;
-        view.someNumber() = 5;
-      }
-
-      for (auto i : cms::alpakatools::uniform_elements(acc, view.metadata().size())) {
-        view[i].a()(0) = 1 + i;
-        view[i].a()(1) = 2 + i;
-        view[i].a()(2) = 3 + i;
-
-        view[i].b()(0) = 4 + i;
-        view[i].b()(1) = 5 + i;
-        view[i].b()(2) = 6 + i;
-
-        view[i].c()(0, 0) = 4 + i;
-        view[i].c()(0, 1) = 6 + i;
-        view[i].c()(1, 0) = 8 + i;
-        view[i].c()(1, 1) = 10 + i;
-
-        view.x()[i] = 12 + i;
-        view.y()[i] = 1 + 2.5 * i;
-        view.z()[i] = 36 * i;
-      }
+class FillKernel {
+ public:
+  template <alpaka::concepts::Acc TAcc>
+  ALPAKA_FN_ACC void operator()(TAcc const& acc, SoACollectionView view) const {
+    if (cms::alpakatools::once_per_grid(acc)) {
+      view.type() = 4;
+      view.someNumber() = 5;
     }
-  };
 
-  class InputVerifyKernel {
-  public:
-    template <alpaka::concepts::Acc TAcc>
-    ALPAKA_FN_ACC void operator()(TAcc const& acc, SoACollectionView view) const {
-      if (cms::alpakatools::once_per_grid(acc)) {
-        ALPAKA_ASSERT_ACC(view.type() == 4);
-        ALPAKA_ASSERT_ACC(view.someNumber() == 5);
-      }
+    for (auto i :
+         cms::alpakatools::uniform_elements(acc, view.metadata().size())) {
+      view[i].a()(0) = 1 + i;
+      view[i].a()(1) = 2 + i;
+      view[i].a()(2) = 3 + i;
 
-      for (auto i : cms::alpakatools::uniform_elements(acc, view.metadata().size())) {
-        ALPAKA_ASSERT_ACC(view[i].a()(0) == 1 + i);
-        ALPAKA_ASSERT_ACC(view[i].a()(1) == 2 + i);
-        ALPAKA_ASSERT_ACC(view[i].a()(2) == 3 + i);
+      view[i].b()(0) = 4 + i;
+      view[i].b()(1) = 5 + i;
+      view[i].b()(2) = 6 + i;
 
-        ALPAKA_ASSERT_ACC(view[i].b()(0) == 4 + i);
-        ALPAKA_ASSERT_ACC(view[i].b()(1) == 5 + i);
-        ALPAKA_ASSERT_ACC(view[i].b()(2) == 6 + i);
+      view[i].c()(0, 0) = 4 + i;
+      view[i].c()(0, 1) = 6 + i;
+      view[i].c()(1, 0) = 8 + i;
+      view[i].c()(1, 1) = 10 + i;
 
-        ALPAKA_ASSERT_ACC(view[i].c()(0, 0) == 4 + i);
-        ALPAKA_ASSERT_ACC(view[i].c()(0, 1) == 6 + i);
-        ALPAKA_ASSERT_ACC(view[i].c()(1, 0) == 8 + i);
-        ALPAKA_ASSERT_ACC(view[i].c()(1, 1) == 10 + i);
-
-        ALPAKA_ASSERT_ACC(view.x()[i] == 12 + i);
-        ALPAKA_ASSERT_ACC(view.y()[i] == 1 + 2.5 * i);
-        ALPAKA_ASSERT_ACC(view.z()[i] == 36 * i);
-      }
-    }
-  };
-
-  class TestOutputVerifyKernel {
-  public:
-    template <alpaka::concepts::Acc TAcc>
-    ALPAKA_FN_ACC void operator()(TAcc const& acc, SoACollectionView view) const {
-      for (auto i : cms::alpakatools::uniform_elements(acc, view.metadata().size())) {
-        ALPAKA_ASSERT_ACC(view.x()[i] - view.v()[i] < tol);
-        ALPAKA_ASSERT_ACC(view.x()[i] - view.v()[i] > -tol);
-
-        ALPAKA_ASSERT_ACC(view.y()[i] - view.w()[i] < tol);
-        ALPAKA_ASSERT_ACC(view.y()[i] - view.w()[i] > -tol);
-      }
-    }
-  };
-
-  void fill(Queue& queue, SoACollection& collection) {
-    size_t items = 64;
-    auto groups = cms::alpakatools::divide_up_by(collection->metadata().size(), items);
-    auto workDiv = cms::alpakatools::make_workdiv<Acc1D>(groups, items);
-    ::alpaka::exec<Acc1D>(queue, workDiv, FillKernel{}, collection.view());
-    ::alpaka::exec<Acc1D>(queue, workDiv, InputVerifyKernel{}, collection.view());
-  }
-
-  void check_output(Queue& queue, SoACollection& collection) {
-    size_t items = 64;
-    auto groups = cms::alpakatools::divide_up_by(collection->metadata().size(), items);
-    auto workDiv = cms::alpakatools::make_workdiv<Acc1D>(groups, items);
-    ::alpaka::exec<Acc1D>(queue, workDiv, TestOutputVerifyKernel{}, collection.view());
-  }
-
-  void check(SoAHostCollectionView& view, std::vector<::torch::IValue>& tensors) {
-    // Check if tensor list built correctly
-    for (int i = 0; i < view.metadata().size(); i++) {
-      CPPUNIT_ASSERT(view[i].a()(0) - tensors[3].toTensor()[i][0][0].item<double>() < tol);
-      CPPUNIT_ASSERT(view[i].a()(1) - tensors[3].toTensor()[i][0][1].item<double>() < tol);
-      CPPUNIT_ASSERT(view[i].a()(2) - tensors[3].toTensor()[i][0][2].item<double>() < tol);
-      CPPUNIT_ASSERT(view[i].a()(0) - tensors[3].toTensor()[i][0][0].item<double>() > -tol);
-      CPPUNIT_ASSERT(view[i].a()(1) - tensors[3].toTensor()[i][0][1].item<double>() > -tol);
-      CPPUNIT_ASSERT(view[i].a()(2) - tensors[3].toTensor()[i][0][2].item<double>() > -tol);
-
-      CPPUNIT_ASSERT(view[i].b()(0) - tensors[3].toTensor()[i][1][0].item<double>() < tol);
-      CPPUNIT_ASSERT(view[i].b()(1) - tensors[3].toTensor()[i][1][1].item<double>() < tol);
-      CPPUNIT_ASSERT(view[i].b()(2) - tensors[3].toTensor()[i][1][2].item<double>() < tol);
-      CPPUNIT_ASSERT(view[i].b()(0) - tensors[3].toTensor()[i][1][0].item<double>() > -tol);
-      CPPUNIT_ASSERT(view[i].b()(1) - tensors[3].toTensor()[i][1][1].item<double>() > -tol);
-      CPPUNIT_ASSERT(view[i].b()(2) - tensors[3].toTensor()[i][1][2].item<double>() > -tol);
-
-      CPPUNIT_ASSERT(view[i].c()(0, 0) - tensors[2].toTensor()[i][0][0].item<float>() < tol);
-      CPPUNIT_ASSERT(view[i].c()(0, 0) - tensors[2].toTensor()[i][0][0].item<float>() > -tol);
-      CPPUNIT_ASSERT(view[i].c()(0, 1) - tensors[2].toTensor()[i][0][1].item<float>() < tol);
-      CPPUNIT_ASSERT(view[i].c()(0, 1) - tensors[2].toTensor()[i][0][1].item<float>() > -tol);
-      CPPUNIT_ASSERT(view[i].c()(1, 0) - tensors[2].toTensor()[i][1][0].item<float>() < tol);
-      CPPUNIT_ASSERT(view[i].c()(1, 0) - tensors[2].toTensor()[i][1][0].item<float>() > -tol);
-      CPPUNIT_ASSERT(view[i].c()(1, 1) - tensors[2].toTensor()[i][1][1].item<float>() < tol);
-      CPPUNIT_ASSERT(view[i].c()(1, 1) - tensors[2].toTensor()[i][1][1].item<float>() > -tol);
-
-      CPPUNIT_ASSERT(view.x()[i] - tensors[0].toTensor()[i][0].item<double>() < tol);
-      CPPUNIT_ASSERT(view.x()[i] - tensors[0].toTensor()[i][0].item<double>() > -tol);
-
-      CPPUNIT_ASSERT(view.x()[i] - tensors[4].toTensor()[i].item<double>() < tol);
-      CPPUNIT_ASSERT(view.x()[i] - tensors[4].toTensor()[i].item<double>() > -tol);
-
-      CPPUNIT_ASSERT(view.y()[i] - tensors[0].toTensor()[i][1].item<double>() < tol);
-      CPPUNIT_ASSERT(view.y()[i] - tensors[0].toTensor()[i][1].item<double>() > -tol);
-
-      CPPUNIT_ASSERT(view.z()[i] - tensors[0].toTensor()[i][2].item<double>() < tol);
-      CPPUNIT_ASSERT(view.z()[i] - tensors[0].toTensor()[i][2].item<double>() > -tol);
-
-      CPPUNIT_ASSERT(view.type() - tensors[1].toTensor()[i].item<float>() < tol);
-      CPPUNIT_ASSERT(view.type() - tensors[1].toTensor()[i].item<float>() > -tol);
+      view.x()[i] = 12 + i;
+      view.y()[i] = 1 + 2.5 * i;
+      view.z()[i] = 36 * i;
     }
   }
+};
 
-  void TestSOADataTypesAlpaka::testInterface() {
-    Platform platform;
-    std::vector<Device> alpakaDevices = ::alpaka::getDevs(platform);
-    const auto& alpakaHost = ::alpaka::getDevByIdx(::alpaka_common::PlatformHost(), 0u);
-    CPPUNIT_ASSERT(alpakaDevices.size());
-    const auto& alpakaDevice = alpakaDevices[0];
-    Queue queue{alpakaDevice};
-    ::torch::Device torchDevice = cms::torch::alpakatools::getDevice(queue);
+class InputVerifyKernel {
+ public:
+  template <alpaka::concepts::Acc TAcc>
+  ALPAKA_FN_ACC void operator()(TAcc const& acc, SoACollectionView view) const {
+    if (cms::alpakatools::once_per_grid(acc)) {
+      ALPAKA_ASSERT_ACC(view.type() == 4);
+      ALPAKA_ASSERT_ACC(view.someNumber() == 5);
+    }
 
-    // Large batch size, so multiple bunches needed
-    const std::size_t batch_size = 64;
+    for (auto i :
+         cms::alpakatools::uniform_elements(acc, view.metadata().size())) {
+      ALPAKA_ASSERT_ACC(view[i].a()(0) == 1 + i);
+      ALPAKA_ASSERT_ACC(view[i].a()(1) == 2 + i);
+      ALPAKA_ASSERT_ACC(view[i].a()(2) == 3 + i);
 
-    // Create and fill needed portable collections
-    SoACollection deviceCollection(queue, batch_size);
-    fill(queue, deviceCollection);
-    auto records = deviceCollection.view().records();
+      ALPAKA_ASSERT_ACC(view[i].b()(0) == 4 + i);
+      ALPAKA_ASSERT_ACC(view[i].b()(1) == 5 + i);
+      ALPAKA_ASSERT_ACC(view[i].b()(2) == 6 + i);
 
-    cms::torch::alpakatools::TensorCollection<Queue> input;
-    input.add<SoA>("vector", records.a(), records.b());
-    input.add<SoA>("single_vector", records.a());
-    input.add<SoA>("matrix", records.c());
-    input.add<SoA>("column", records.x(), records.y(), records.z());
-    input.add<SoA>("single_column", records.x());
-    input.add<SoA>("scalar", records.type());
-    input.change_order({"column", "scalar", "matrix", "vector", "single_column", "single_vector"});
+      ALPAKA_ASSERT_ACC(view[i].c()(0, 0) == 4 + i);
+      ALPAKA_ASSERT_ACC(view[i].c()(0, 1) == 6 + i);
+      ALPAKA_ASSERT_ACC(view[i].c()(1, 0) == 8 + i);
+      ALPAKA_ASSERT_ACC(view[i].c()(1, 1) == 10 + i);
 
-    std::vector<::torch::IValue> tensors = cms::torch::alpakatools::detail::convertInput(input, torchDevice);
+      ALPAKA_ASSERT_ACC(view.x()[i] == 12 + i);
+      ALPAKA_ASSERT_ACC(view.y()[i] == 1 + 2.5 * i);
+      ALPAKA_ASSERT_ACC(view.z()[i] == 36 * i);
+    }
+  }
+};
 
-    SoAHostCollection hostCollection(queue, batch_size);
-    alpaka::memcpy(queue, hostCollection.buffer(), deviceCollection.buffer());
-    alpaka::wait(queue);
+class TestOutputVerifyKernel {
+ public:
+  template <alpaka::concepts::Acc TAcc>
+  ALPAKA_FN_ACC void operator()(TAcc const& acc, SoACollectionView view) const {
+    for (auto i :
+         cms::alpakatools::uniform_elements(acc, view.metadata().size())) {
+      ALPAKA_ASSERT_ACC(view.x()[i] - view.v()[i] < tol);
+      ALPAKA_ASSERT_ACC(view.x()[i] - view.v()[i] > -tol);
 
-    check(hostCollection.view(), tensors);
-  };
+      ALPAKA_ASSERT_ACC(view.y()[i] - view.w()[i] < tol);
+      ALPAKA_ASSERT_ACC(view.y()[i] - view.w()[i] > -tol);
+    }
+  }
+};
 
-  void TestSOADataTypesAlpaka::testMultiOutput() {
-    Platform platform;
-    std::vector<Device> alpakaDevices = ::alpaka::getDevs(platform);
-    const auto& alpakaHost = ::alpaka::getDevByIdx(::alpaka_common::PlatformHost(), 0u);
-    CPPUNIT_ASSERT(alpakaDevices.size());
-    const auto& alpakaDevice = alpakaDevices[0];
-    Queue queue{alpakaDevice};
-    ::torch::Device torchDevice = cms::torch::alpakatools::getDevice(queue);
+void fill(Queue& queue, SoACollection& collection) {
+  size_t items = 64;
+  auto groups =
+      cms::alpakatools::divide_up_by(collection->metadata().size(), items);
+  auto workDiv = cms::alpakatools::make_workdiv<Acc1D>(groups, items);
+  ::alpaka::exec<Acc1D>(queue, workDiv, FillKernel{}, collection.view());
+  ::alpaka::exec<Acc1D>(queue, workDiv, InputVerifyKernel{}, collection.view());
+}
 
-    // Large batch size, so multiple bunches needed
-    const std::size_t batch_size = 64;
+void check_output(Queue& queue, SoACollection& collection) {
+  size_t items = 64;
+  auto groups =
+      cms::alpakatools::divide_up_by(collection->metadata().size(), items);
+  auto workDiv = cms::alpakatools::make_workdiv<Acc1D>(groups, items);
+  ::alpaka::exec<Acc1D>(queue, workDiv, TestOutputVerifyKernel{},
+                        collection.view());
+}
 
-    // Create and fill needed portable collections
-    SoACollection deviceCollection(queue, batch_size);
-    fill(queue, deviceCollection);
+void check(SoAHostCollectionView& view, std::vector<::torch::IValue>& tensors) {
+  // Check if tensor list built correctly
+  for (int i = 0; i < view.metadata().size(); i++) {
+    CPPUNIT_ASSERT(
+        view[i].a()(0) - tensors[3].toTensor()[i][0][0].item<double>() < tol);
+    CPPUNIT_ASSERT(
+        view[i].a()(1) - tensors[3].toTensor()[i][0][1].item<double>() < tol);
+    CPPUNIT_ASSERT(
+        view[i].a()(2) - tensors[3].toTensor()[i][0][2].item<double>() < tol);
+    CPPUNIT_ASSERT(
+        view[i].a()(0) - tensors[3].toTensor()[i][0][0].item<double>() > -tol);
+    CPPUNIT_ASSERT(
+        view[i].a()(1) - tensors[3].toTensor()[i][0][1].item<double>() > -tol);
+    CPPUNIT_ASSERT(
+        view[i].a()(2) - tensors[3].toTensor()[i][0][2].item<double>() > -tol);
 
-    auto records = deviceCollection.view().records();
-    cms::torch::alpakatools::TensorCollection<Queue> input;
-    input.add<SoA>("x", records.x());
-    input.add<SoA>("y", records.y());
+    CPPUNIT_ASSERT(
+        view[i].b()(0) - tensors[3].toTensor()[i][1][0].item<double>() < tol);
+    CPPUNIT_ASSERT(
+        view[i].b()(1) - tensors[3].toTensor()[i][1][1].item<double>() < tol);
+    CPPUNIT_ASSERT(
+        view[i].b()(2) - tensors[3].toTensor()[i][1][2].item<double>() < tol);
+    CPPUNIT_ASSERT(
+        view[i].b()(0) - tensors[3].toTensor()[i][1][0].item<double>() > -tol);
+    CPPUNIT_ASSERT(
+        view[i].b()(1) - tensors[3].toTensor()[i][1][1].item<double>() > -tol);
+    CPPUNIT_ASSERT(
+        view[i].b()(2) - tensors[3].toTensor()[i][1][2].item<double>() > -tol);
 
-    cms::torch::alpakatools::TensorCollection<Queue> output;
-    output.add<SoA>("v", records.v());
-    output.add<SoA>("w", records.w());
+    CPPUNIT_ASSERT(
+        view[i].c()(0, 0) - tensors[2].toTensor()[i][0][0].item<float>() < tol);
+    CPPUNIT_ASSERT(view[i].c()(0, 0) -
+                       tensors[2].toTensor()[i][0][0].item<float>() >
+                   -tol);
+    CPPUNIT_ASSERT(
+        view[i].c()(0, 1) - tensors[2].toTensor()[i][0][1].item<float>() < tol);
+    CPPUNIT_ASSERT(view[i].c()(0, 1) -
+                       tensors[2].toTensor()[i][0][1].item<float>() >
+                   -tol);
+    CPPUNIT_ASSERT(
+        view[i].c()(1, 0) - tensors[2].toTensor()[i][1][0].item<float>() < tol);
+    CPPUNIT_ASSERT(view[i].c()(1, 0) -
+                       tensors[2].toTensor()[i][1][0].item<float>() >
+                   -tol);
+    CPPUNIT_ASSERT(
+        view[i].c()(1, 1) - tensors[2].toTensor()[i][1][1].item<float>() < tol);
+    CPPUNIT_ASSERT(view[i].c()(1, 1) -
+                       tensors[2].toTensor()[i][1][1].item<float>() >
+                   -tol);
 
-    std::vector<::torch::IValue> tensors = cms::torch::alpakatools::detail::convertInput(input, torchDevice);
-    cms::torch::alpakatools::detail::convertOutput(tensors, output, torchDevice);
+    CPPUNIT_ASSERT(view.x()[i] - tensors[0].toTensor()[i][0].item<double>() <
+                   tol);
+    CPPUNIT_ASSERT(view.x()[i] - tensors[0].toTensor()[i][0].item<double>() >
+                   -tol);
 
-    // Check if tensor list built correctly
-    check_output(queue, deviceCollection);
-  };
+    CPPUNIT_ASSERT(view.x()[i] - tensors[4].toTensor()[i].item<double>() < tol);
+    CPPUNIT_ASSERT(view.x()[i] - tensors[4].toTensor()[i].item<double>() >
+                   -tol);
 
-  void TestSOADataTypesAlpaka::testSingleElement() {
-    Platform platform;
-    std::vector<Device> alpakaDevices = ::alpaka::getDevs(platform);
-    CPPUNIT_ASSERT(alpakaDevices.size());
-    const auto& alpakaDevice = alpakaDevices[0];
-    Queue queue(alpakaDevice);
-    ::torch::Device torchDevice = cms::torch::alpakatools::getDevice(queue);
+    CPPUNIT_ASSERT(view.y()[i] - tensors[0].toTensor()[i][1].item<double>() <
+                   tol);
+    CPPUNIT_ASSERT(view.y()[i] - tensors[0].toTensor()[i][1].item<double>() >
+                   -tol);
 
-    // Create and fill portable collections
-    const std::size_t batch_size = 1;
-    SoACollection deviceCollection(queue, batch_size);
-    fill(queue, deviceCollection);
-    auto records = deviceCollection.view().records();
+    CPPUNIT_ASSERT(view.z()[i] - tensors[0].toTensor()[i][2].item<double>() <
+                   tol);
+    CPPUNIT_ASSERT(view.z()[i] - tensors[0].toTensor()[i][2].item<double>() >
+                   -tol);
 
-    // Run Converter for single tensor
-    cms::torch::alpakatools::TensorCollection<Queue> input;
-    input.add<SoA>("vector", records.a(), records.b());
-    input.add<SoA>("single_vector", records.a(), records.b());
-    input.add<SoA>("matrix", records.c());
-    input.add<SoA>("column", records.x(), records.y(), records.z());
-    input.add<SoA>("single_column", records.x());
-    input.add<SoA>("scalar", records.type());
-    input.change_order({"column", "scalar", "matrix", "vector", "single_column", "single_vector"});
+    CPPUNIT_ASSERT(view.type() - tensors[1].toTensor()[i].item<float>() < tol);
+    CPPUNIT_ASSERT(view.type() - tensors[1].toTensor()[i].item<float>() > -tol);
+  }
+}
 
-    cms::torch::alpakatools::TensorCollection<Queue> output;
-    output.add<SoA>("result", records.v());
+void TestSOADataTypesAlpaka::testInterface() {
+  Platform platform;
+  std::vector<Device> alpakaDevices = ::alpaka::getDevs(platform);
+  const auto& alpakaHost =
+      ::alpaka::getDevByIdx(::alpaka_common::PlatformHost(), 0u);
+  CPPUNIT_ASSERT(alpakaDevices.size());
+  const auto& alpakaDevice = alpakaDevices[0];
+  Queue queue{alpakaDevice};
+  ::torch::Device torchDevice = cms::torch::alpakatools::getDevice(queue);
 
-    std::vector<::torch::IValue> tensors = cms::torch::alpakatools::detail::convertInput(input, torchDevice);
+  // Large batch size, so multiple bunches needed
+  const std::size_t batch_size = 64;
 
-    // Check if tensor list built correctly
-    SoAHostCollection hostCollection(queue, batch_size);
-    ::alpaka::memcpy(queue, hostCollection.buffer(), deviceCollection.buffer());
-    ::alpaka::wait(queue);
-    check(hostCollection.view(), tensors);
-  };
+  // Create and fill needed portable collections
+  SoACollection deviceCollection(queue, batch_size);
+  fill(queue, deviceCollection);
+  auto records = deviceCollection.view().records();
 
-  void TestSOADataTypesAlpaka::testNoElement() {
-    Platform platform;
-    std::vector<Device> alpakaDevices = ::alpaka::getDevs(platform);
-    CPPUNIT_ASSERT(alpakaDevices.size());
-    const auto& alpakaDevice = alpakaDevices[0];
-    Queue queue(alpakaDevice);
-    ::torch::Device torchDevice = cms::torch::alpakatools::getDevice(queue);
+  cms::torch::alpakatools::TensorCollection<Queue> input;
+  input.add<SoA>("vector", records.a(), records.b());
+  input.add<SoA>("single_vector", records.a());
+  input.add<SoA>("matrix", records.c());
+  input.add<SoA>("column", records.x(), records.y(), records.z());
+  input.add<SoA>("single_column", records.x());
+  input.add<SoA>("scalar", records.type());
+  input.change_order({"column", "scalar", "matrix", "vector", "single_column",
+                      "single_vector"});
 
-    //Create empty portable collection
-    const std::size_t batch_size = 0;
-    SoACollection deviceCollection(queue, batch_size);
-    auto records = deviceCollection.view().records();
+  std::vector<::torch::IValue> tensors =
+      cms::torch::alpakatools::detail::convertInput(input, torchDevice);
 
-    // Run Converter
-    cms::torch::alpakatools::TensorCollection<Queue> input;
-    input.add<SoA>("vector", records.a(), records.b());
-    input.add<SoA>("matrix", records.c());
-    input.add<SoA>("column", records.x(), records.y(), records.z());
-    input.add<SoA>("scalar", records.type());
-    input.change_order({"column", "scalar", "matrix", "vector"});
+  SoAHostCollection hostCollection(queue, batch_size);
+  alpaka::memcpy(queue, hostCollection.buffer(), deviceCollection.buffer());
+  alpaka::wait(queue);
 
-    std::vector<::torch::IValue> tensors = cms::torch::alpakatools::detail::convertInput(input, torchDevice);
+  check(hostCollection.view(), tensors);
+};
 
-    // Check if tensor list has empty tensors
-    CPPUNIT_ASSERT(tensors[0].toTensor().size(0) == 0);
-    CPPUNIT_ASSERT(tensors[1].toTensor().size(0) == 0);
-    CPPUNIT_ASSERT(tensors[2].toTensor().size(0) == 0);
-    CPPUNIT_ASSERT(tensors[3].toTensor().size(0) == 0);
-  };
+void TestSOADataTypesAlpaka::testMultiOutput() {
+  Platform platform;
+  std::vector<Device> alpakaDevices = ::alpaka::getDevs(platform);
+  const auto& alpakaHost =
+      ::alpaka::getDevByIdx(::alpaka_common::PlatformHost(), 0u);
+  CPPUNIT_ASSERT(alpakaDevices.size());
+  const auto& alpakaDevice = alpakaDevices[0];
+  Queue queue{alpakaDevice};
+  ::torch::Device torchDevice = cms::torch::alpakatools::getDevice(queue);
 
-  void TestSOADataTypesAlpaka::testEmptyMetadata() {
-    // alpaka setup
-    Platform platform;
-    std::vector<Device> alpakaDevices = ::alpaka::getDevs(platform);
-    CPPUNIT_ASSERT(alpakaDevices.size());
-    const auto& alpakaDevice = alpakaDevices[0];
-    Queue queue(alpakaDevice);
-    ::torch::Device torchDevice = cms::torch::alpakatools::getDevice(queue);
+  // Large batch size, so multiple bunches needed
+  const std::size_t batch_size = 64;
 
-    // Create and fill portable collections
-    const std::size_t batch_size = 32;
-    SoACollection deviceCollection(queue, batch_size);
-    fill(queue, deviceCollection);
+  // Create and fill needed portable collections
+  SoACollection deviceCollection(queue, batch_size);
+  fill(queue, deviceCollection);
 
-    // Run Converter for empty metadata
-    cms::torch::alpakatools::TensorCollection<Queue> input;
+  auto records = deviceCollection.view().records();
+  cms::torch::alpakatools::TensorCollection<Queue> input;
+  input.add<SoA>("x", records.x());
+  input.add<SoA>("y", records.y());
 
-    std::vector<::torch::IValue> tensors = cms::torch::alpakatools::detail::convertInput(input, torchDevice);
+  cms::torch::alpakatools::TensorCollection<Queue> output;
+  output.add<SoA>("v", records.v());
+  output.add<SoA>("w", records.w());
 
-    // Check if tensor list is empty
-    CPPUNIT_ASSERT(tensors.size() == 0);
-  };
+  std::vector<::torch::IValue> tensors =
+      cms::torch::alpakatools::detail::convertInput(input, torchDevice);
+  cms::torch::alpakatools::detail::convertOutput(tensors, output, torchDevice);
+
+  // Check if tensor list built correctly
+  check_output(queue, deviceCollection);
+};
+
+void TestSOADataTypesAlpaka::testSingleElement() {
+  Platform platform;
+  std::vector<Device> alpakaDevices = ::alpaka::getDevs(platform);
+  CPPUNIT_ASSERT(alpakaDevices.size());
+  const auto& alpakaDevice = alpakaDevices[0];
+  Queue queue(alpakaDevice);
+  ::torch::Device torchDevice = cms::torch::alpakatools::getDevice(queue);
+
+  // Create and fill portable collections
+  const std::size_t batch_size = 1;
+  SoACollection deviceCollection(queue, batch_size);
+  fill(queue, deviceCollection);
+  auto records = deviceCollection.view().records();
+
+  // Run Converter for single tensor
+  cms::torch::alpakatools::TensorCollection<Queue> input;
+  input.add<SoA>("vector", records.a(), records.b());
+  input.add<SoA>("single_vector", records.a(), records.b());
+  input.add<SoA>("matrix", records.c());
+  input.add<SoA>("column", records.x(), records.y(), records.z());
+  input.add<SoA>("single_column", records.x());
+  input.add<SoA>("scalar", records.type());
+  input.change_order({"column", "scalar", "matrix", "vector", "single_column",
+                      "single_vector"});
+
+  cms::torch::alpakatools::TensorCollection<Queue> output;
+  output.add<SoA>("result", records.v());
+
+  std::vector<::torch::IValue> tensors =
+      cms::torch::alpakatools::detail::convertInput(input, torchDevice);
+
+  // Check if tensor list built correctly
+  SoAHostCollection hostCollection(queue, batch_size);
+  ::alpaka::memcpy(queue, hostCollection.buffer(), deviceCollection.buffer());
+  ::alpaka::wait(queue);
+  check(hostCollection.view(), tensors);
+};
+
+void TestSOADataTypesAlpaka::testNoElement() {
+  Platform platform;
+  std::vector<Device> alpakaDevices = ::alpaka::getDevs(platform);
+  CPPUNIT_ASSERT(alpakaDevices.size());
+  const auto& alpakaDevice = alpakaDevices[0];
+  Queue queue(alpakaDevice);
+  ::torch::Device torchDevice = cms::torch::alpakatools::getDevice(queue);
+
+  // Create empty portable collection
+  const std::size_t batch_size = 0;
+  SoACollection deviceCollection(queue, batch_size);
+  auto records = deviceCollection.view().records();
+
+  // Run Converter
+  cms::torch::alpakatools::TensorCollection<Queue> input;
+  input.add<SoA>("vector", records.a(), records.b());
+  input.add<SoA>("matrix", records.c());
+  input.add<SoA>("column", records.x(), records.y(), records.z());
+  input.add<SoA>("scalar", records.type());
+  input.change_order({"column", "scalar", "matrix", "vector"});
+
+  std::vector<::torch::IValue> tensors =
+      cms::torch::alpakatools::detail::convertInput(input, torchDevice);
+
+  // Check if tensor list has empty tensors
+  CPPUNIT_ASSERT(tensors[0].toTensor().size(0) == 0);
+  CPPUNIT_ASSERT(tensors[1].toTensor().size(0) == 0);
+  CPPUNIT_ASSERT(tensors[2].toTensor().size(0) == 0);
+  CPPUNIT_ASSERT(tensors[3].toTensor().size(0) == 0);
+};
+
+void TestSOADataTypesAlpaka::testEmptyMetadata() {
+  // alpaka setup
+  Platform platform;
+  std::vector<Device> alpakaDevices = ::alpaka::getDevs(platform);
+  CPPUNIT_ASSERT(alpakaDevices.size());
+  const auto& alpakaDevice = alpakaDevices[0];
+  Queue queue(alpakaDevice);
+  ::torch::Device torchDevice = cms::torch::alpakatools::getDevice(queue);
+
+  // Create and fill portable collections
+  const std::size_t batch_size = 32;
+  SoACollection deviceCollection(queue, batch_size);
+  fill(queue, deviceCollection);
+
+  // Run Converter for empty metadata
+  cms::torch::alpakatools::TensorCollection<Queue> input;
+
+  std::vector<::torch::IValue> tensors =
+      cms::torch::alpakatools::detail::convertInput(input, torchDevice);
+
+  // Check if tensor list is empty
+  CPPUNIT_ASSERT(tensors.size() == 0);
+};
 
 }  // namespace ALPAKA_ACCELERATOR_NAMESPACE::torchtest

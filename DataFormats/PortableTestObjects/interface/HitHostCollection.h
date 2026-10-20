@@ -6,9 +6,9 @@
 
 namespace portabletest {
 
-  using HitHostCollection = PortableHostCollection<HitSoA>;
-  using HitToTrackHostCollection = PortableHostCollection<HitToTrackSoA>;
-  using TrackBeginHostCollection = PortableHostCollection<TrackBeginSoA>;
+using HitHostCollection = PortableHostCollection<HitSoA>;
+using HitToTrackHostCollection = PortableHostCollection<HitToTrackSoA>;
+using TrackBeginHostCollection = PortableHostCollection<TrackBeginSoA>;
 
 }  // namespace portabletest
 

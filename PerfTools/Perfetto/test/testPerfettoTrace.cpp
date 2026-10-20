@@ -22,47 +22,50 @@
 #include "PerfTools/Perfetto/interface/CMSSWPerfettoTrace.h"
 
 namespace {
-  // Perfetto may be initialized only once per process.
-  void initPerfettoOnce() {
-    [[maybe_unused]] static const bool done = [] {
-      ::perfetto::TracingInitArgs args;
-      args.backends = ::perfetto::kInProcessBackend;
-      ::perfetto::Tracing::Initialize(args);
-      cms::perfetto::TrackEvent::Register();
-      return true;
-    }();
-  }
+// Perfetto may be initialized only once per process.
+void initPerfettoOnce() {
+  [[maybe_unused]] static const bool done = [] {
+    ::perfetto::TracingInitArgs args;
+    args.backends = ::perfetto::kInProcessBackend;
+    ::perfetto::Tracing::Initialize(args);
+    cms::perfetto::TrackEvent::Register();
+    return true;
+  }();
+}
 
-  // Run |emit| in a fresh in-process session with only |categories| enabled, as
-  // the service configures it, and return the serialized trace.
-  std::vector<char> recordTrace(std::initializer_list<const char*> categories, const std::function<void()>& emit) {
-    initPerfettoOnce();
-    ::perfetto::TraceConfig cfg;
-    cfg.add_buffers()->set_size_kb(8192);
-    auto* ds = cfg.add_data_sources()->mutable_config();
-    ds->set_name("track_event");
-    ::perfetto::protos::gen::TrackEventConfig te;
-    te.add_disabled_categories("*");
-    for (const char* c : categories)
-      te.add_enabled_categories(c);
-    ds->set_track_event_config_raw(te.SerializeAsString());
+// Run |emit| in a fresh in-process session with only |categories| enabled, as
+// the service configures it, and return the serialized trace.
+std::vector<char> recordTrace(std::initializer_list<const char*> categories,
+                              const std::function<void()>& emit) {
+  initPerfettoOnce();
+  ::perfetto::TraceConfig cfg;
+  cfg.add_buffers()->set_size_kb(8192);
+  auto* ds = cfg.add_data_sources()->mutable_config();
+  ds->set_name("track_event");
+  ::perfetto::protos::gen::TrackEventConfig te;
+  te.add_disabled_categories("*");
+  for (const char* c : categories) te.add_enabled_categories(c);
+  ds->set_track_event_config_raw(te.SerializeAsString());
 
-    auto session = ::perfetto::Tracing::NewTrace();
-    session->Setup(cfg);
-    session->StartBlocking();
-    emit();
-    cms::perfetto::TrackEvent::Flush();
-    session->StopBlocking();
-    return session->ReadTraceBlocking();
-  }
+  auto session = ::perfetto::Tracing::NewTrace();
+  session->Setup(cfg);
+  session->StartBlocking();
+  emit();
+  cms::perfetto::TrackEvent::Flush();
+  session->StopBlocking();
+  return session->ReadTraceBlocking();
+}
 
-  bool contains(std::vector<char> const& bytes, std::string_view what) {
-    return std::string_view(bytes.data(), bytes.size()).find(what) != std::string_view::npos;
-  }
+bool contains(std::vector<char> const& bytes, std::string_view what) {
+  return std::string_view(bytes.data(), bytes.size()).find(what) !=
+         std::string_view::npos;
+}
 }  // namespace
 
-TEST_CASE("Perfetto trace has the expected track/counter/slice structure", "[perfetto]") {
-  // no using-directive for cms::perfetto here: it would make the TRACE_* macros ambiguous
+TEST_CASE("Perfetto trace has the expected track/counter/slice structure",
+          "[perfetto]") {
+  // no using-directive for cms::perfetto here: it would make the TRACE_* macros
+  // ambiguous
   using cms::perfetto::laneTrack;
   using cms::perfetto::streamTrack;
   auto bytes = recordTrace({"cmssw.event", "cmssw.module"}, [] {
@@ -79,22 +82,28 @@ TEST_CASE("Perfetto trace has the expected track/counter/slice structure", "[per
         d.set_name("edm::stream " + std::to_string(s));
         cms::perfetto::TrackEvent::SetTrackDescriptor(st, d);
       }
-      TRACE_EVENT_BEGIN("cmssw.event", "Event", st, "run", 1, "lumi", 1, "event", static_cast<int>(s + 1));
-      TRACE_COUNTER("cmssw.event", ::perfetto::CounterTrack("run", "id", st), 1.0);
+      TRACE_EVENT_BEGIN("cmssw.event", "Event", st, "run", 1, "lumi", 1,
+                        "event", static_cast<int>(s + 1));
+      TRACE_COUNTER("cmssw.event", ::perfetto::CounterTrack("run", "id", st),
+                    1.0);
       auto lane = laneTrack(s);
       TRACE_EVENT_BEGIN("cmssw.module", "outer", lane);
-      TRACE_EVENT_BEGIN("cmssw.module", "inner", lane);  // nests inside outer on the same lane
+      TRACE_EVENT_BEGIN("cmssw.module", "inner",
+                        lane);  // nests inside outer on the same lane
       TRACE_EVENT_END("cmssw.module", lane);
       TRACE_EVENT_END("cmssw.module", lane);
       TRACE_EVENT_END("cmssw.event", st);
-      TRACE_COUNTER("cmssw.event", ::perfetto::CounterTrack("Throughput (events/s)"), 100.0 + s);
+      TRACE_COUNTER("cmssw.event",
+                    ::perfetto::CounterTrack("Throughput (events/s)"),
+                    100.0 + s);
     }
   });
 
   REQUIRE(!bytes.empty());
 
   namespace pb = ::perfetto::protos::pbzero;
-  pb::Trace::Decoder trace(reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size());
+  pb::Trace::Decoder trace(reinterpret_cast<const uint8_t*>(bytes.data()),
+                           bytes.size());
 
   // the process-wide Throughput counter is checked by the presence of its name
   bool const sawThroughput = contains(bytes, "Throughput (events/s)");
@@ -113,11 +122,9 @@ TEST_CASE("Perfetto trace has the expected track/counter/slice structure", "[per
       std::string const name = td.name().ToStdString();
       if (td.has_process()) {
         pb::ProcessDescriptor::Decoder p(td.process());
-        if (p.process_name().ToStdString() == "cmsRun")
-          sawProcess = true;
+        if (p.process_name().ToStdString() == "cmsRun") sawProcess = true;
       }
-      if (name.rfind("edm::stream", 0) == 0)
-        streamUuids.insert(td.uuid());
+      if (name.rfind("edm::stream", 0) == 0) streamUuids.insert(td.uuid());
     }
     if (packet.has_track_event()) {
       pb::TrackEvent::Decoder te(packet.track_event());
@@ -137,15 +144,15 @@ TEST_CASE("Perfetto trace has the expected track/counter/slice structure", "[per
     }
   }
 
-  // Second pass: lanes are descriptors parented to a stream track -- exactly the
-  // property the per-(stream,thread) lane scheme must preserve.
-  pb::Trace::Decoder trace2(reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size());
+  // Second pass: lanes are descriptors parented to a stream track -- exactly
+  // the property the per-(stream,thread) lane scheme must preserve.
+  pb::Trace::Decoder trace2(reinterpret_cast<const uint8_t*>(bytes.data()),
+                            bytes.size());
   for (auto it = trace2.packet(); it; ++it) {
     pb::TracePacket::Decoder packet(*it);
     if (packet.has_track_descriptor()) {
       pb::TrackDescriptor::Decoder td(packet.track_descriptor());
-      if (streamUuids.count(td.parent_uuid()))
-        ++laneTracks;
+      if (streamUuids.count(td.parent_uuid())) ++laneTracks;
     }
   }
 
@@ -159,7 +166,8 @@ TEST_CASE("Perfetto trace has the expected track/counter/slice structure", "[per
   REQUIRE(counters >= 4);   // 2 streams x (run counter + Throughput counter)
 }
 
-TEST_CASE("lane and stream track uuids are distinct and correctly parented", "[perfetto]") {
+TEST_CASE("lane and stream track uuids are distinct and correctly parented",
+          "[perfetto]") {
   using namespace cms::perfetto;
   initPerfettoOnce();
 
@@ -170,23 +178,28 @@ TEST_CASE("lane and stream track uuids are distinct and correctly parented", "[p
 
   auto l0 = laneTrack(0);
   auto l1 = laneTrack(1);
-  REQUIRE(l0.uuid != 0);                  // a lane must not collapse onto the root (the old xor-cancellation bug)
-  REQUIRE(l0.uuid != s0.uuid);            // lane is its own track, not the stream track
-  REQUIRE(l0.uuid != l1.uuid);            // different streams -> different lanes
-  REQUIRE(l0.parent_uuid == s0.uuid);     // the lane hangs under its stream
-  REQUIRE(laneTrack(0).uuid == l0.uuid);  // stable for the same (stream, thread)
+  REQUIRE(l0.uuid != 0);  // a lane must not collapse onto the root (the old
+                          // xor-cancellation bug)
+  REQUIRE(l0.uuid != s0.uuid);  // lane is its own track, not the stream track
+  REQUIRE(l0.uuid != l1.uuid);  // different streams -> different lanes
+  REQUIRE(l0.parent_uuid == s0.uuid);  // the lane hangs under its stream
+  REQUIRE(laneTrack(0).uuid ==
+          l0.uuid);  // stable for the same (stream, thread)
 }
 
-TEST_CASE("CMS_PERFETTO_SCOPE is recorded only when cmssw.func is enabled", "[perfetto]") {
+TEST_CASE("CMS_PERFETTO_SCOPE is recorded only when cmssw.func is enabled",
+          "[perfetto]") {
   auto const emit = [] {
     cms::perfetto::ModuleContextGuard guard({"someModule", 0});
     CMS_PERFETTO_SCOPE("scopeUnderTest");
   };
-  REQUIRE(contains(recordTrace({"cmssw.event", "cmssw.func"}, emit), "scopeUnderTest"));
+  REQUIRE(contains(recordTrace({"cmssw.event", "cmssw.func"}, emit),
+                   "scopeUnderTest"));
   REQUIRE_FALSE(contains(recordTrace({"cmssw.event"}, emit), "scopeUnderTest"));
 }
 
-TEST_CASE("module context stack nests and propagates across threads", "[perfetto]") {
+TEST_CASE("module context stack nests and propagates across threads",
+          "[perfetto]") {
   using namespace cms::perfetto;
   REQUIRE(currentModuleContext().label == nullptr);
 
@@ -214,20 +227,22 @@ TEST_CASE("module context stack nests and propagates across threads", "[perfetto
 
   REQUIRE(std::string(popModuleContext().label) == "A");
   REQUIRE(currentModuleContext().label == nullptr);
-  REQUIRE(popModuleContext().label == nullptr);  // popping an empty stack is harmless
+  REQUIRE(popModuleContext().label ==
+          nullptr);  // popping an empty stack is harmless
 }
 
-TEST_CASE("module context stack stays balanced past its capacity", "[perfetto]") {
+TEST_CASE("module context stack stays balanced past its capacity",
+          "[perfetto]") {
   using namespace cms::perfetto;
   constexpr int kDeep = 100;  // more than the stack holds
   int recorded = 0;
-  for (int i = 0; i < kDeep; ++i)
-    recorded += pushModuleContext({"deep", 0});
+  for (int i = 0; i < kDeep; ++i) recorded += pushModuleContext({"deep", 0});
   REQUIRE(recorded > 0);
   REQUIRE(recorded < kDeep);
   int traced = 0;
-  for (int i = 0; i < kDeep; ++i)
-    traced += popModuleContext().label != nullptr;
-  REQUIRE(traced == recorded);  // every recorded push, and only those, pops a traced entry
+  for (int i = 0; i < kDeep; ++i) traced += popModuleContext().label != nullptr;
+  REQUIRE(
+      traced ==
+      recorded);  // every recorded push, and only those, pops a traced entry
   REQUIRE(currentModuleContext().label == nullptr);
 }

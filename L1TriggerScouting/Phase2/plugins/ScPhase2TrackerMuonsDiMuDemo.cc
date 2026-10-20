@@ -1,41 +1,39 @@
-#include <memory>
-#include "FWCore/Framework/interface/Frameworkfwd.h"
-#include "FWCore/Framework/interface/stream/EDProducer.h"
-#include "FWCore/Framework/interface/Event.h"
-#include "FWCore/Framework/interface/MakerMacros.h"
-#include "FWCore/ParameterSet/interface/ParameterSet.h"
-#include "FWCore/Utilities/interface/StreamID.h"
-
-#include "DataFormats/L1Scouting/interface/OrbitCollection.h"
-#include "DataFormats/NanoAOD/interface/OrbitFlatTable.h"
-#include "DataFormats/L1TParticleFlow/interface/PFCandidate.h"
-#include "DataFormats/L1TMuonPhase2/interface/L1ScoutingTrackerMuon.h"
-#include "L1TriggerScouting/Utilities/interface/BxOffsetsFiller.h"
-
-#include <ROOT/RVec.hxx>
-#include <Math/Vector4D.h>
 #include <Math/GenVector/LorentzVector.h>
 #include <Math/GenVector/PtEtaPhiM4D.h>
+#include <Math/Vector4D.h>
+
+#include <ROOT/RVec.hxx>
 #include <algorithm>
 #include <array>
 #include <iostream>
+#include <memory>
+
+#include "DataFormats/L1Scouting/interface/OrbitCollection.h"
+#include "DataFormats/L1TMuonPhase2/interface/L1ScoutingTrackerMuon.h"
+#include "DataFormats/L1TParticleFlow/interface/PFCandidate.h"
+#include "DataFormats/NanoAOD/interface/OrbitFlatTable.h"
+#include "FWCore/Framework/interface/Event.h"
+#include "FWCore/Framework/interface/Frameworkfwd.h"
+#include "FWCore/Framework/interface/MakerMacros.h"
+#include "FWCore/Framework/interface/stream/EDProducer.h"
+#include "FWCore/ParameterSet/interface/ParameterSet.h"
+#include "FWCore/Utilities/interface/StreamID.h"
+#include "L1TriggerScouting/Utilities/interface/BxOffsetsFiller.h"
 
 class ScPhase2TrackerMuonDiMuDemo : public edm::stream::EDProducer<> {
-public:
-  explicit ScPhase2TrackerMuonDiMuDemo(const edm::ParameterSet &);
+ public:
+  explicit ScPhase2TrackerMuonDiMuDemo(const edm::ParameterSet&);
   ~ScPhase2TrackerMuonDiMuDemo() override;
-  static void fillDescriptions(edm::ConfigurationDescriptions &descriptions);
+  static void fillDescriptions(edm::ConfigurationDescriptions& descriptions);
 
-private:
+ private:
   void beginStream(edm::StreamID) override;
-  void produce(edm::Event &, const edm::EventSetup &) override;
+  void produce(edm::Event&, const edm::EventSetup&) override;
   void endStream() override;
   template <typename T>
-  void runObj(const OrbitCollection<T> &src,
-              edm::Event &out,
-              unsigned long &nTry,
-              unsigned long &nPass,
-              const std::string &bxLabel);
+  void runObj(const OrbitCollection<T>& src, edm::Event& out,
+              unsigned long& nTry, unsigned long& nPass,
+              const std::string& bxLabel);
 
   bool doStruct_;
   edm::EDGetTokenT<OrbitCollection<l1Scouting::TrackerMuon>> structToken_;
@@ -54,10 +52,12 @@ private:
   unsigned long passStruct_;
 };
 
-ScPhase2TrackerMuonDiMuDemo::ScPhase2TrackerMuonDiMuDemo(const edm::ParameterSet &iConfig)
+ScPhase2TrackerMuonDiMuDemo::ScPhase2TrackerMuonDiMuDemo(
+    const edm::ParameterSet& iConfig)
     : doStruct_(iConfig.getParameter<bool>("runStruct")) {
   if (doStruct_) {
-    structToken_ = consumes<OrbitCollection<l1Scouting::TrackerMuon>>(iConfig.getParameter<edm::InputTag>("src"));
+    structToken_ = consumes<OrbitCollection<l1Scouting::TrackerMuon>>(
+        iConfig.getParameter<edm::InputTag>("src"));
     produces<std::vector<unsigned>>("selectedBx");
     produces<l1ScoutingRun3::OrbitFlatTable>("dimu");
   }
@@ -70,7 +70,8 @@ void ScPhase2TrackerMuonDiMuDemo::beginStream(edm::StreamID) {
   passStruct_ = 0;
 }
 
-void ScPhase2TrackerMuonDiMuDemo::produce(edm::Event &iEvent, const edm::EventSetup &iSetup) {
+void ScPhase2TrackerMuonDiMuDemo::produce(edm::Event& iEvent,
+                                          const edm::EventSetup& iSetup) {
   if (doStruct_) {
     edm::Handle<OrbitCollection<l1Scouting::TrackerMuon>> src;
     iEvent.getByToken(structToken_, src);
@@ -81,15 +82,16 @@ void ScPhase2TrackerMuonDiMuDemo::produce(edm::Event &iEvent, const edm::EventSe
 void ScPhase2TrackerMuonDiMuDemo::endStream() {
   if (doStruct_)
     edm::LogImportant("ScPhase2AnalysisSummary")
-        << "DiTrackerMuon Struct analysis: " << countStruct_ << " -> " << passStruct_;
+        << "DiTrackerMuon Struct analysis: " << countStruct_ << " -> "
+        << passStruct_;
 }
 
 template <typename T>
-void ScPhase2TrackerMuonDiMuDemo::runObj(const OrbitCollection<T> &src,
-                                         edm::Event &iEvent,
-                                         unsigned long &nTry,
-                                         unsigned long &nPass,
-                                         const std::string &label) {
+void ScPhase2TrackerMuonDiMuDemo::runObj(const OrbitCollection<T>& src,
+                                         edm::Event& iEvent,
+                                         unsigned long& nTry,
+                                         unsigned long& nPass,
+                                         const std::string& label) {
   l1ScoutingRun3::BxOffsetsFillter bxOffsetsFiller;
   bxOffsetsFiller.start();
   auto selectedBx_idx = std::make_unique<std::vector<unsigned>>();
@@ -99,40 +101,30 @@ void ScPhase2TrackerMuonDiMuDemo::runObj(const OrbitCollection<T> &src,
   for (unsigned int bx = 1; bx <= OrbitCollection<T>::NBX; ++bx) {
     nTry++;
     auto range = src.bxIterator(bx);
-    const T *cands = &range.front();
+    const T* cands = &range.front();
     auto size = range.size();
     bool hasCandidate = false;
     for (unsigned int i = 0; i < size; ++i) {
-      if (cands[i].pt() < cuts.ptMin)
-        break;  // assumes pt ordering
-      if (cands[i].z0() > cuts.z0Max)
-        continue;
-      if (abs(cands[i].eta()) > cuts.etaMax)
-        continue;
-      if (cands[i].quality() < cuts.qualityMin)
-        continue;
+      if (cands[i].pt() < cuts.ptMin) break;  // assumes pt ordering
+      if (cands[i].z0() > cuts.z0Max) continue;
+      if (abs(cands[i].eta()) > cuts.etaMax) continue;
+      if (cands[i].quality() < cuts.qualityMin) continue;
       // if(    cands[i].isolation()   > XX  ) continue;
 
       for (unsigned int j = i + 1; j < size; ++j) {
-        if (cands[j].pt() < cuts.ptMin)
-          break;  // assumes pt ordering
-        if (cuts.doOppsiteCharge and (cands[i].charge() * cands[j].charge() > 0))
+        if (cands[j].pt() < cuts.ptMin) break;  // assumes pt ordering
+        if (cuts.doOppsiteCharge and
+            (cands[i].charge() * cands[j].charge() > 0))
           continue;
-        if (abs(cands[j].z0()) > cuts.z0Max)
-          continue;
-        if (abs(cands[j].eta()) > cuts.etaMax)
-          continue;
-        if (cands[j].quality() < cuts.qualityMin)
-          continue;
+        if (abs(cands[j].z0()) > cuts.z0Max) continue;
+        if (abs(cands[j].eta()) > cuts.etaMax) continue;
+        if (cands[j].quality() < cuts.qualityMin) continue;
         //      if(    cands[j].isolation()   > YY  ) continue;
 
         mass = (cands[i].p4() + cands[j].p4()).mass();
-        if (mass < cuts.massMin)
-          continue;
-        if (cands[j].pt() < cuts.minptOverMass * mass)
-          continue;
-        if (cands[i].pt() < cuts.minptOverMass * mass)
-          continue;
+        if (mass < cuts.massMin) continue;
+        if (cands[j].pt() < cuts.minptOverMass * mass) continue;
+        if (cands[i].pt() < cuts.minptOverMass * mass) continue;
         selectedBx_idx->emplace_back(bx);
         masses.push_back(mass);
         i0s.push_back(i);
@@ -142,21 +134,22 @@ void ScPhase2TrackerMuonDiMuDemo::runObj(const OrbitCollection<T> &src,
       }
     }
 
-    if (hasCandidate)
-      nPass++;
+    if (hasCandidate) nPass++;
   }  // loop on BXs
 
   iEvent.put(std::move(selectedBx_idx), "selectedBx" + label);
   // now we make the table
   auto bxOffsets = bxOffsetsFiller.done();
-  auto tab = std::make_unique<l1ScoutingRun3::OrbitFlatTable>(bxOffsets, "DiMu" + label, true);
+  auto tab = std::make_unique<l1ScoutingRun3::OrbitFlatTable>(
+      bxOffsets, "DiMu" + label, true);
   tab->addColumn<float>("mass", masses, "Dimuon invariant mass");
   tab->addColumn<uint8_t>("i0", i0s, "leading muon");
   tab->addColumn<uint8_t>("i1", i1s, "subleading muon");
   iEvent.put(std::move(tab), "dimu" + label);
 }
 
-void ScPhase2TrackerMuonDiMuDemo::fillDescriptions(edm::ConfigurationDescriptions &descriptions) {
+void ScPhase2TrackerMuonDiMuDemo::fillDescriptions(
+    edm::ConfigurationDescriptions& descriptions) {
   edm::ParameterSetDescription desc;
   desc.add<edm::InputTag>("src");
   desc.add<bool>("runStruct", true);

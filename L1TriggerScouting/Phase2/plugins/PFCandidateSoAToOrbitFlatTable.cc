@@ -1,39 +1,36 @@
-#include "FWCore/Framework/interface/MakerMacros.h"
-
+#include <cmath>
 #include <fstream>
 #include <iomanip>
 #include <memory>
 #include <string>
-#include <cmath>
 
-#include "FWCore/Framework/interface/global/EDProducer.h"
+#include "DataFormats/L1ScoutingSoA/interface/BxLookupHost.h"
+#include "DataFormats/L1ScoutingSoA/interface/PFCandidateHostCollection.h"
+#include "DataFormats/NanoAOD/interface/OrbitFlatTable.h"
 #include "FWCore/Framework/interface/Event.h"
+#include "FWCore/Framework/interface/EventSetup.h"
+#include "FWCore/Framework/interface/Frameworkfwd.h"
+#include "FWCore/Framework/interface/MakerMacros.h"
+#include "FWCore/Framework/interface/global/EDProducer.h"
+#include "FWCore/MessageLogger/interface/MessageDrop.h"
+#include "FWCore/MessageLogger/interface/MessageLogger.h"
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
 #include "FWCore/Utilities/interface/EDGetToken.h"
 #include "FWCore/Utilities/interface/InputTag.h"
-#include "FWCore/Framework/interface/EventSetup.h"
-#include "FWCore/Framework/interface/Frameworkfwd.h"
-#include "FWCore/MessageLogger/interface/MessageLogger.h"
-#include "FWCore/MessageLogger/interface/MessageDrop.h"
-
 #include "L1TriggerScouting/Utilities/interface/BxOffsetsFiller.h"
 
-#include "DataFormats/NanoAOD/interface/OrbitFlatTable.h"
-#include "DataFormats/L1ScoutingSoA/interface/BxLookupHost.h"
-#include "DataFormats/L1ScoutingSoA/interface/PFCandidateHostCollection.h"
-
-
 class PFCandidateSoAToOrbitFlatTable : public edm::global::EDProducer<> {
-public:
+ public:
   // constructor and destructor
   explicit PFCandidateSoAToOrbitFlatTable(const edm::ParameterSet&);
   ~PFCandidateSoAToOrbitFlatTable() override {};
 
-  void produce(edm::StreamID, edm::Event&, edm::EventSetup const&) const override;
+  void produce(edm::StreamID, edm::Event&,
+               edm::EventSetup const&) const override;
 
   static void fillDescriptions(edm::ConfigurationDescriptions& descriptions);
 
-private:
+ private:
   // the tokens to access the data
   edm::EDGetTokenT<l1sc::BxLookupHost> srcBx_;
   edm::EDGetTokenT<l1sc::PFCandidateHostCollection> srcCandidates_;
@@ -44,9 +41,12 @@ private:
 
 // -------------------------------- constructor  -------------------------------
 
-PFCandidateSoAToOrbitFlatTable::PFCandidateSoAToOrbitFlatTable(const edm::ParameterSet& iConfig)
-    : srcBx_(consumes<l1sc::BxLookupHost>(iConfig.getParameter<edm::InputTag>("srcBx"))),
-      srcCandidates_(consumes<l1sc::PFCandidateHostCollection>(iConfig.getParameter<edm::InputTag>("srcCandidates"))),
+PFCandidateSoAToOrbitFlatTable::PFCandidateSoAToOrbitFlatTable(
+    const edm::ParameterSet& iConfig)
+    : srcBx_(consumes<l1sc::BxLookupHost>(
+          iConfig.getParameter<edm::InputTag>("srcBx"))),
+      srcCandidates_(consumes<l1sc::PFCandidateHostCollection>(
+          iConfig.getParameter<edm::InputTag>("srcCandidates"))),
       name_(iConfig.getParameter<std::string>("name")),
       doc_(iConfig.getParameter<std::string>("doc")) {
   produces<l1ScoutingRun3::OrbitFlatTable>();
@@ -54,14 +54,15 @@ PFCandidateSoAToOrbitFlatTable::PFCandidateSoAToOrbitFlatTable(const edm::Parame
 // -----------------------------------------------------------------------------
 
 // ----------------------- method called for each orbit  -----------------------
-void PFCandidateSoAToOrbitFlatTable::produce(edm::StreamID, edm::Event& iEvent, edm::EventSetup const&) const {
+void PFCandidateSoAToOrbitFlatTable::produce(edm::StreamID, edm::Event& iEvent,
+                                             edm::EventSetup const&) const {
   edm::Handle<l1sc::BxLookupHost> srcBx;
   iEvent.getByToken(srcBx_, srcBx);
   edm::Handle<l1sc::PFCandidateHostCollection> srcCandidates;
   iEvent.getByToken(srcCandidates_, srcCandidates);
 
   const unsigned int nbx = srcBx->const_view().offset().metadata().size() - 1;
-  const auto *bx_offsets = srcBx->const_view().offset().offset().data();
+  const auto* bx_offsets = srcBx->const_view().offset().offset().data();
 
   // fill Offsets
   l1ScoutingRun3::BxOffsetsFillter bxOffsetsFiller;
@@ -77,14 +78,14 @@ void PFCandidateSoAToOrbitFlatTable::produce(edm::StreamID, edm::Event& iEvent, 
   auto bxOffsets = bxOffsetsFiller.done();
 
   // fill Candidates
-  const auto *pt = srcCandidates->const_view().pt().data();
-  const auto *eta = srcCandidates->const_view().eta().data();
-  const auto *phi = srcCandidates->const_view().phi().data();
-  const auto *z0 = srcCandidates->const_view().z0().data();
-  const auto *dxy = srcCandidates->const_view().dxy().data();
-  const auto *puppiw = srcCandidates->const_view().puppiw().data();
-  const auto *quality = srcCandidates->const_view().quality().data();
-  const auto *pdgid = srcCandidates->const_view().pdgid().data();
+  const auto* pt = srcCandidates->const_view().pt().data();
+  const auto* eta = srcCandidates->const_view().eta().data();
+  const auto* phi = srcCandidates->const_view().phi().data();
+  const auto* z0 = srcCandidates->const_view().z0().data();
+  const auto* dxy = srcCandidates->const_view().dxy().data();
+  const auto* puppiw = srcCandidates->const_view().puppiw().data();
+  const auto* quality = srcCandidates->const_view().quality().data();
+  const auto* pdgid = srcCandidates->const_view().pdgid().data();
 
   const unsigned int npf = srcCandidates->const_view().metadata().size();
 
@@ -96,8 +97,9 @@ void PFCandidateSoAToOrbitFlatTable::produce(edm::StreamID, edm::Event& iEvent, 
   std::vector<float> pf_puppiw{puppiw, puppiw + npf};
   std::vector<uint8_t> pf_quality{quality, quality + npf};
   std::vector<int16_t> pf_pdgid{pdgid, pdgid + npf};
-  
-  auto out = std::make_unique<l1ScoutingRun3::OrbitFlatTable>(bxOffsets, name_); // singleton and extension set to false by default
+
+  auto out = std::make_unique<l1ScoutingRun3::OrbitFlatTable>(
+      bxOffsets, name_);  // singleton and extension set to false by default
   out->setDoc(doc_);
   out->addColumn<float>("pt", pf_pt, "L1PF pt");
   out->addColumn<float>("eta", pf_eta, "L1PF eta");
@@ -110,7 +112,8 @@ void PFCandidateSoAToOrbitFlatTable::produce(edm::StreamID, edm::Event& iEvent, 
   iEvent.put(std::move(out));
 }
 
-void PFCandidateSoAToOrbitFlatTable::fillDescriptions(edm::ConfigurationDescriptions& descriptions) {
+void PFCandidateSoAToOrbitFlatTable::fillDescriptions(
+    edm::ConfigurationDescriptions& descriptions) {
   edm::ParameterSetDescription desc;
   desc.add<edm::InputTag>("srcBx");
   desc.add<edm::InputTag>("srcCandidates");

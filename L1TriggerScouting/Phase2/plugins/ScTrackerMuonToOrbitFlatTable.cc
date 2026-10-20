@@ -1,36 +1,35 @@
-#include "FWCore/Framework/interface/MakerMacros.h"
-
+#include <cmath>
 #include <fstream>
 #include <iomanip>
 #include <memory>
 #include <string>
-#include <cmath>
-
-#include "FWCore/Framework/interface/global/EDProducer.h"
-#include "FWCore/Framework/interface/Event.h"
-#include "FWCore/ParameterSet/interface/ParameterSet.h"
-#include "FWCore/Utilities/interface/EDGetToken.h"
-#include "FWCore/Utilities/interface/InputTag.h"
-#include "FWCore/Framework/interface/EventSetup.h"
-#include "FWCore/Framework/interface/Frameworkfwd.h"
-#include "FWCore/MessageLogger/interface/MessageLogger.h"
-#include "FWCore/MessageLogger/interface/MessageDrop.h"
 
 #include "DataFormats/L1Scouting/interface/OrbitCollection.h"
 #include "DataFormats/L1TMuonPhase2/interface/L1ScoutingTrackerMuon.h"
 #include "DataFormats/NanoAOD/interface/OrbitFlatTable.h"
+#include "FWCore/Framework/interface/Event.h"
+#include "FWCore/Framework/interface/EventSetup.h"
+#include "FWCore/Framework/interface/Frameworkfwd.h"
+#include "FWCore/Framework/interface/MakerMacros.h"
+#include "FWCore/Framework/interface/global/EDProducer.h"
+#include "FWCore/MessageLogger/interface/MessageDrop.h"
+#include "FWCore/MessageLogger/interface/MessageLogger.h"
+#include "FWCore/ParameterSet/interface/ParameterSet.h"
+#include "FWCore/Utilities/interface/EDGetToken.h"
+#include "FWCore/Utilities/interface/InputTag.h"
 
 class ScTrackerMuonToOrbitFlatTable : public edm::global::EDProducer<> {
-public:
+ public:
   // constructor and destructor
   explicit ScTrackerMuonToOrbitFlatTable(const edm::ParameterSet&);
   ~ScTrackerMuonToOrbitFlatTable() override {};
 
-  void produce(edm::StreamID, edm::Event&, edm::EventSetup const&) const override;
+  void produce(edm::StreamID, edm::Event&,
+               edm::EventSetup const&) const override;
 
   static void fillDescriptions(edm::ConfigurationDescriptions& descriptions);
 
-private:
+ private:
   // the tokens to access the data
   edm::EDGetTokenT<OrbitCollection<l1Scouting::TrackerMuon>> src_;
 
@@ -40,8 +39,10 @@ private:
 
 // -------------------------------- constructor  -------------------------------
 
-ScTrackerMuonToOrbitFlatTable::ScTrackerMuonToOrbitFlatTable(const edm::ParameterSet& iConfig)
-    : src_(consumes<OrbitCollection<l1Scouting::TrackerMuon>>(iConfig.getParameter<edm::InputTag>("src"))),
+ScTrackerMuonToOrbitFlatTable::ScTrackerMuonToOrbitFlatTable(
+    const edm::ParameterSet& iConfig)
+    : src_(consumes<OrbitCollection<l1Scouting::TrackerMuon>>(
+          iConfig.getParameter<edm::InputTag>("src"))),
       name_(iConfig.getParameter<std::string>("name")),
       doc_(iConfig.getParameter<std::string>("doc")) {
   produces<l1ScoutingRun3::OrbitFlatTable>();
@@ -49,14 +50,16 @@ ScTrackerMuonToOrbitFlatTable::ScTrackerMuonToOrbitFlatTable(const edm::Paramete
 // -----------------------------------------------------------------------------
 
 // ----------------------- method called for each orbit  -----------------------
-void ScTrackerMuonToOrbitFlatTable::produce(edm::StreamID, edm::Event& iEvent, edm::EventSetup const&) const {
+void ScTrackerMuonToOrbitFlatTable::produce(edm::StreamID, edm::Event& iEvent,
+                                            edm::EventSetup const&) const {
   edm::Handle<OrbitCollection<l1Scouting::TrackerMuon>> src;
   iEvent.getByToken(src_, src);
 
-  auto out = std::make_unique<l1ScoutingRun3::OrbitFlatTable>(src->bxOffsets(), name_);
+  auto out =
+      std::make_unique<l1ScoutingRun3::OrbitFlatTable>(src->bxOffsets(), name_);
   out->setDoc(doc_);
-  std::vector<float> pt(out->size()), eta(out->size()), phi(out->size()), z0(out->size()), d0(out->size()),
-      beta(out->size());
+  std::vector<float> pt(out->size()), eta(out->size()), phi(out->size()),
+      z0(out->size()), d0(out->size()), beta(out->size());
   std::vector<uint8_t> quality(out->size()), isolation(out->size());
   std::vector<int16_t> charge(out->size());
   unsigned int i = 0;
@@ -83,7 +86,8 @@ void ScTrackerMuonToOrbitFlatTable::produce(edm::StreamID, edm::Event& iEvent, e
   iEvent.put(std::move(out));
 }
 
-void ScTrackerMuonToOrbitFlatTable::fillDescriptions(edm::ConfigurationDescriptions& descriptions) {
+void ScTrackerMuonToOrbitFlatTable::fillDescriptions(
+    edm::ConfigurationDescriptions& descriptions) {
   edm::ParameterSetDescription desc;
 
   desc.add<edm::InputTag>("src");

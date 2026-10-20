@@ -8,14 +8,16 @@
 
 namespace ALPAKA_ACCELERATOR_NAMESPACE::torchportabletest {
 
-  using namespace ::torchportabletest;
+using namespace ::torchportabletest;
 
-  using MaskDevice = PortableCollection<Mask>;
-  using ScalarMaskDevice = PortableCollection<ScalarMask>;
+using MaskDevice = PortableCollection<Mask>;
+using ScalarMaskDevice = PortableCollection<ScalarMask>;
 
 }  // namespace ALPAKA_ACCELERATOR_NAMESPACE::torchportabletest
 
-ASSERT_DEVICE_MATCHES_HOST_COLLECTION(torchportabletest::MaskDevice, torchportabletest::MaskHost);
-ASSERT_DEVICE_MATCHES_HOST_COLLECTION(torchportabletest::ScalarMaskDevice, torchportabletest::ScalarMaskHost);
+ASSERT_DEVICE_MATCHES_HOST_COLLECTION(torchportabletest::MaskDevice,
+                                      torchportabletest::MaskHost);
+ASSERT_DEVICE_MATCHES_HOST_COLLECTION(torchportabletest::ScalarMaskDevice,
+                                      torchportabletest::ScalarMaskHost);
 
 #endif  // PhysicsTools_PyTorchAlpakaTest_interface_alpaka_MaskDevice_h

@@ -3,13 +3,13 @@
 
 #include <alpaka/alpaka.hpp>
 
+#include "DataFormats/L1ScoutingSoA/interface/SelectedBxSoA.h"
 #include "DataFormats/Portable/interface/PortableCollection.h"
 #include "DataFormats/Portable/interface/PortableHostCollection.h"
-#include "DataFormats/L1ScoutingSoA/interface/SelectedBxSoA.h"
 
 namespace l1sc {
 
-  using SelectedBxHostCollection = PortableHostCollection<SelectedBxSoA>;
+using SelectedBxHostCollection = PortableHostCollection<SelectedBxSoA>;
 
 }  // namespace l1sc
 

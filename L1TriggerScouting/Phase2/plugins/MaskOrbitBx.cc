@@ -1,8 +1,8 @@
 #include "L1TriggerScouting/OnlineProcessing/interface/MaskOrbitBx.h"
 
+#include "DataFormats/L1TMuonPhase2/interface/L1ScoutingTrackerMuon.h"
 #include "DataFormats/L1TParticleFlow/interface/L1ScoutingPuppi.h"
 #include "DataFormats/L1TParticleFlow/interface/L1ScoutingTkEm.h"
-#include "DataFormats/L1TMuonPhase2/interface/L1ScoutingTrackerMuon.h"
 #include "FWCore/Framework/interface/MakerMacros.h"
 
 typedef MaskOrbitBx<l1Scouting::Puppi> MaskOrbitBxScoutingPuppi;

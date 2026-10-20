@@ -10,14 +10,14 @@
 
 namespace portabletest {
 
-  GENERATE_SOA_LAYOUT(
-      HitLayout, SOA_COLUMN(float, x), SOA_COLUMN(float, y), SOA_COLUMN(float, z), SOA_SCALAR(float, hitScale))
-  GENERATE_SOA_LAYOUT(HitToTrackLayout, SOA_COLUMN(int, trackIndex))
-  GENERATE_SOA_LAYOUT(TrackBeginLayout, SOA_COLUMN(int, trackBegin))
+GENERATE_SOA_LAYOUT(HitLayout, SOA_COLUMN(float, x), SOA_COLUMN(float, y),
+                    SOA_COLUMN(float, z), SOA_SCALAR(float, hitScale))
+GENERATE_SOA_LAYOUT(HitToTrackLayout, SOA_COLUMN(int, trackIndex))
+GENERATE_SOA_LAYOUT(TrackBeginLayout, SOA_COLUMN(int, trackBegin))
 
-  using HitSoA = HitLayout<>;
-  using HitToTrackSoA = HitToTrackLayout<>;
-  using TrackBeginSoA = TrackBeginLayout<>;
+using HitSoA = HitLayout<>;
+using HitToTrackSoA = HitToTrackLayout<>;
+using TrackBeginSoA = TrackBeginLayout<>;
 
 }  // namespace portabletest
 

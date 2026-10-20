@@ -8,12 +8,12 @@
 
 namespace torchportabletest {
 
-  using PartMask = Eigen::Vector<uint8_t, 3>;
-  GENERATE_SOA_LAYOUT(MaskLayout, SOA_EIGEN_COLUMN(PartMask, mask));
-  GENERATE_SOA_LAYOUT(ScalarMaskLayout, SOA_SCALAR(uint8_t, scalar_mask))
+using PartMask = Eigen::Vector<uint8_t, 3>;
+GENERATE_SOA_LAYOUT(MaskLayout, SOA_EIGEN_COLUMN(PartMask, mask));
+GENERATE_SOA_LAYOUT(ScalarMaskLayout, SOA_SCALAR(uint8_t, scalar_mask))
 
-  using Mask = MaskLayout<>;
-  using ScalarMask = ScalarMaskLayout<>;
+using Mask = MaskLayout<>;
+using ScalarMask = ScalarMaskLayout<>;
 
 }  // namespace torchportabletest
 

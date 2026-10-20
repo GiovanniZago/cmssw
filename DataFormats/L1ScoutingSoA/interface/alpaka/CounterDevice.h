@@ -1,21 +1,21 @@
 #ifndef DataFormats_L1ScoutingSoA_interface_alpaka_CounterDevice_h
 #define DataFormats_L1ScoutingSoA_interface_alpaka_CounterDevice_h
 
-#include "DataFormats/Portable/interface/alpaka/PortableObject.h"
-#include "DataFormats/Portable/interface/PortableHostObject.h"
 #include "DataFormats/L1ScoutingSoA/interface/CounterHost.h"
-#include "HeterogeneousCore/AlpakaInterface/interface/config.h"
+#include "DataFormats/Portable/interface/PortableHostObject.h"
+#include "DataFormats/Portable/interface/alpaka/PortableObject.h"
 #include "HeterogeneousCore/AlpakaInterface/interface/CopyToHost.h"
+#include "HeterogeneousCore/AlpakaInterface/interface/config.h"
 
 namespace ALPAKA_ACCELERATOR_NAMESPACE::l1sc {
 
-  /**
-   * make the names from the top-level `l1sc` namespace visible for unqualified lookup
-   * inside the `ALPAKA_ACCELERATOR_NAMESPACE::l1sc` namespace
-   */
-  using namespace ::l1sc;
+/**
+ * make the names from the top-level `l1sc` namespace visible for unqualified
+ * lookup inside the `ALPAKA_ACCELERATOR_NAMESPACE::l1sc` namespace
+ */
+using namespace ::l1sc;
 
-  using CounterDevice = PortableObject<unsigned int>;
+using CounterDevice = PortableObject<unsigned int>;
 
 }  // namespace ALPAKA_ACCELERATOR_NAMESPACE::l1sc
 

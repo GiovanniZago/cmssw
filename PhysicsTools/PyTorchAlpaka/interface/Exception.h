@@ -5,7 +5,8 @@
 
 namespace cms::torch::alpakatools::detail {
 
-  [[noreturn]] void throwException(const std::string& category, const std::string& message);
+[[noreturn]] void throwException(const std::string& category,
+                                 const std::string& message);
 
 }  // namespace cms::torch::alpakatools::detail
 

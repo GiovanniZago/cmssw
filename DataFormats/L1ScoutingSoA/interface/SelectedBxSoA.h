@@ -5,9 +5,9 @@
 
 namespace l1sc {
 
-  GENERATE_SOA_LAYOUT(SelectedBxLayout, SOA_COLUMN(uint32_t, bx))
+GENERATE_SOA_LAYOUT(SelectedBxLayout, SOA_COLUMN(uint32_t, bx))
 
-  using SelectedBxSoA = SelectedBxLayout<>;
+using SelectedBxSoA = SelectedBxLayout<>;
 
 }  // namespace l1sc
 

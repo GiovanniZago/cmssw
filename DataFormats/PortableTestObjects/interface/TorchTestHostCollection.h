@@ -6,11 +6,11 @@
 
 namespace torchportabletest {
 
-  using ParticleHostCollection = PortableHostCollection<ParticleSoA>;
-  using SimpleNetHostCollection = PortableHostCollection<SimpleNetSoA>;
-  using MultiHeadNetHostCollection = PortableHostCollection<MultiHeadNetSoA>;
-  using ImageHostCollection = PortableHostCollection<Image>;
-  using LogitsHostCollection = PortableHostCollection<Logits>;
+using ParticleHostCollection = PortableHostCollection<ParticleSoA>;
+using SimpleNetHostCollection = PortableHostCollection<SimpleNetSoA>;
+using MultiHeadNetHostCollection = PortableHostCollection<MultiHeadNetSoA>;
+using ImageHostCollection = PortableHostCollection<Image>;
+using LogitsHostCollection = PortableHostCollection<Logits>;
 
 }  // namespace torchportabletest
 

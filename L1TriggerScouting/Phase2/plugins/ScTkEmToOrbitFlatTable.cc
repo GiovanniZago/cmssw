@@ -1,36 +1,35 @@
-#include "FWCore/Framework/interface/MakerMacros.h"
-
+#include <cmath>
 #include <fstream>
 #include <iomanip>
 #include <memory>
 #include <string>
-#include <cmath>
-
-#include "FWCore/Framework/interface/global/EDProducer.h"
-#include "FWCore/Framework/interface/Event.h"
-#include "FWCore/ParameterSet/interface/ParameterSet.h"
-#include "FWCore/Utilities/interface/EDGetToken.h"
-#include "FWCore/Utilities/interface/InputTag.h"
-#include "FWCore/Framework/interface/EventSetup.h"
-#include "FWCore/Framework/interface/Frameworkfwd.h"
-#include "FWCore/MessageLogger/interface/MessageLogger.h"
-#include "FWCore/MessageLogger/interface/MessageDrop.h"
 
 #include "DataFormats/L1Scouting/interface/OrbitCollection.h"
 #include "DataFormats/L1TParticleFlow/interface/L1ScoutingTkEm.h"
 #include "DataFormats/NanoAOD/interface/OrbitFlatTable.h"
+#include "FWCore/Framework/interface/Event.h"
+#include "FWCore/Framework/interface/EventSetup.h"
+#include "FWCore/Framework/interface/Frameworkfwd.h"
+#include "FWCore/Framework/interface/MakerMacros.h"
+#include "FWCore/Framework/interface/global/EDProducer.h"
+#include "FWCore/MessageLogger/interface/MessageDrop.h"
+#include "FWCore/MessageLogger/interface/MessageLogger.h"
+#include "FWCore/ParameterSet/interface/ParameterSet.h"
+#include "FWCore/Utilities/interface/EDGetToken.h"
+#include "FWCore/Utilities/interface/InputTag.h"
 
 class ScTkEmToOrbitFlatTable : public edm::global::EDProducer<> {
-public:
+ public:
   // constructor and destructor
   explicit ScTkEmToOrbitFlatTable(const edm::ParameterSet&);
   ~ScTkEmToOrbitFlatTable() override {};
 
-  void produce(edm::StreamID, edm::Event&, edm::EventSetup const&) const override;
+  void produce(edm::StreamID, edm::Event&,
+               edm::EventSetup const&) const override;
 
   static void fillDescriptions(edm::ConfigurationDescriptions& descriptions);
 
-private:
+ private:
   // the tokens to access the data
   edm::EDGetTokenT<OrbitCollection<l1Scouting::TkEm>> src_;
 
@@ -41,7 +40,8 @@ private:
 // -------------------------------- constructor  -------------------------------
 
 ScTkEmToOrbitFlatTable::ScTkEmToOrbitFlatTable(const edm::ParameterSet& iConfig)
-    : src_(consumes<OrbitCollection<l1Scouting::TkEm>>(iConfig.getParameter<edm::InputTag>("src"))),
+    : src_(consumes<OrbitCollection<l1Scouting::TkEm>>(
+          iConfig.getParameter<edm::InputTag>("src"))),
       name_(iConfig.getParameter<std::string>("name")),
       doc_(iConfig.getParameter<std::string>("doc")) {
   produces<l1ScoutingRun3::OrbitFlatTable>();
@@ -49,12 +49,15 @@ ScTkEmToOrbitFlatTable::ScTkEmToOrbitFlatTable(const edm::ParameterSet& iConfig)
 // -----------------------------------------------------------------------------
 
 // ----------------------- method called for each orbit  -----------------------
-void ScTkEmToOrbitFlatTable::produce(edm::StreamID, edm::Event& iEvent, edm::EventSetup const&) const {
+void ScTkEmToOrbitFlatTable::produce(edm::StreamID, edm::Event& iEvent,
+                                     edm::EventSetup const&) const {
   edm::Handle<OrbitCollection<l1Scouting::TkEm>> src;
   iEvent.getByToken(src_, src);
-  auto out = std::make_unique<l1ScoutingRun3::OrbitFlatTable>(src->bxOffsets(), name_);
+  auto out =
+      std::make_unique<l1ScoutingRun3::OrbitFlatTable>(src->bxOffsets(), name_);
   out->setDoc(doc_);
-  std::vector<float> pt(out->size()), eta(out->size()), phi(out->size()), isolation(out->size());
+  std::vector<float> pt(out->size()), eta(out->size()), phi(out->size()),
+      isolation(out->size());
   std::vector<uint8_t> quality(out->size());
   unsigned int i = 0;
   for (const l1Scouting::TkEm& tkem : *src) {
@@ -73,7 +76,8 @@ void ScTkEmToOrbitFlatTable::produce(edm::StreamID, edm::Event& iEvent, edm::Eve
   iEvent.put(std::move(out));
 }
 
-void ScTkEmToOrbitFlatTable::fillDescriptions(edm::ConfigurationDescriptions& descriptions) {
+void ScTkEmToOrbitFlatTable::fillDescriptions(
+    edm::ConfigurationDescriptions& descriptions) {
   edm::ParameterSetDescription desc;
 
   desc.add<edm::InputTag>("src");

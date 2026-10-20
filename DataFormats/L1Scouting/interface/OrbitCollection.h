@@ -1,16 +1,16 @@
 #ifndef DataFormats_L1Scouting_OrbitCollection_h
 #define DataFormats_L1Scouting_OrbitCollection_h
 
-#include "DataFormats/Common/interface/CMS_CLASS_VERSION.h"
-#include "FWCore/MessageLogger/interface/MessageLogger.h"
-
 #include <cstdint>
 #include <span>
 #include <vector>
 
+#include "DataFormats/Common/interface/CMS_CLASS_VERSION.h"
+#include "FWCore/MessageLogger/interface/MessageLogger.h"
+
 template <class T>
 class OrbitCollection {
-public:
+ public:
   static constexpr int NBX = 3564;
 
   typedef typename std::vector<T>::iterator iterator;
@@ -19,12 +19,14 @@ public:
   typedef typename std::vector<T>::size_type size_type;
 
   // Initialize the offset vector with 0s from 0 to 3565.
-  // BX range is [1,3564], an extra entry is needed for the offserts of the last BX
+  // BX range is [1,3564], an extra entry is needed for the offserts of the last
+  // BX
   OrbitCollection() : bxOffsets_(orbitBufferSize_ + 1, 0), data_(0) {}
   // Construct the flat orbit collection starting from an OrbitBuffer.
-  // The method fillAndClear will be used, meaning that, after copying the objects,
-  // orbitBuffer's vectors will be cleared.
-  OrbitCollection(std::vector<std::vector<T>>& orbitBuffer, unsigned nObjects = 0)
+  // The method fillAndClear will be used, meaning that, after copying the
+  // objects, orbitBuffer's vectors will be cleared.
+  OrbitCollection(std::vector<std::vector<T>>& orbitBuffer,
+                  unsigned nObjects = 0)
       : bxOffsets_(orbitBufferSize_ + 1, 0), data_() {
     fillAndClear(orbitBuffer, nObjects);
   }
@@ -35,14 +37,16 @@ public:
   OrbitCollection& operator=(OrbitCollection&& other) = default;
 
   // Fill the orbit collection starting from a vector of vectors, one per BX.
-  // Objects are copied into a flat data vector, and a second vector is used to keep track
-  // of the starting index in the data vector for every BX.
-  // After the copy, the original input buffer is cleared.
-  // Input vector must be sorted with increasing BX and contain 3565 elements (BX in [1,3564])
-  void fillAndClear(std::vector<std::vector<T>>& orbitBuffer, unsigned nObjects = 0) {
+  // Objects are copied into a flat data vector, and a second vector is used to
+  // keep track of the starting index in the data vector for every BX. After the
+  // copy, the original input buffer is cleared. Input vector must be sorted
+  // with increasing BX and contain 3565 elements (BX in [1,3564])
+  void fillAndClear(std::vector<std::vector<T>>& orbitBuffer,
+                    unsigned nObjects = 0) {
     if (orbitBuffer.size() != orbitBufferSize_)
       throw cms::Exception("OrbitCollection::fillAndClear")
-          << "Trying to fill the collection by passing an orbit buffer with incorrect size. "
+          << "Trying to fill the collection by passing an orbit buffer with "
+             "incorrect size. "
           << "Passed " << orbitBuffer.size() << ", expected 3565";
     data_.reserve(nObjects);
     bxOffsets_[0] = 0;
@@ -70,10 +74,12 @@ public:
   // iterate over elements of a bx
   std::span<const T> bxIterator(unsigned bx) const {
     if (bx >= orbitBufferSize_)
-      throw cms::Exception("OrbitCollection::bxIterator") << "Trying to access and object outside the orbit range. "
-                                                          << " BX = " << bx;
+      throw cms::Exception("OrbitCollection::bxIterator")
+          << "Trying to access and object outside the orbit range. "
+          << " BX = " << bx;
     if (getBxSize(bx) > 0) {
-      return std::span<const T>(data_.begin() + bxOffsets_[bx], data_.begin() + bxOffsets_[bx + 1]);
+      return std::span<const T>(data_.begin() + bxOffsets_[bx],
+                                data_.begin() + bxOffsets_[bx + 1]);
     } else {
       return std::span<const T>();
     }
@@ -82,8 +88,9 @@ public:
   // get number of objects stored in a BX
   unsigned getBxSize(unsigned bx) const {
     if (bx >= orbitBufferSize_) {
-      cms::Exception("OrbitCollection") << "Called getBxSize() of a bx out of the orbit range."
-                                        << " BX = " << bx;
+      cms::Exception("OrbitCollection")
+          << "Called getBxSize() of a bx out of the orbit range."
+          << " BX = " << bx;
       return 0;
     }
     return bxOffsets_[bx + 1] - bxOffsets_[bx];
@@ -92,8 +99,9 @@ public:
   // get i-th object from BX
   const T& getBxObject(unsigned bx, unsigned i) const {
     if (bx >= orbitBufferSize_)
-      throw cms::Exception("OrbitCollection::getBxObject") << "Trying to access and object outside the orbit range. "
-                                                           << " BX = " << bx;
+      throw cms::Exception("OrbitCollection::getBxObject")
+          << "Trying to access and object outside the orbit range. "
+          << " BX = " << bx;
     if (i >= getBxSize(bx))
       throw cms::Exception("OrbitCollection::getBxObject")
           << "Trying to get element " << i << " but for"
@@ -119,13 +127,13 @@ public:
   T& operator[](std::size_t i) { return data_[i]; }
   const T& operator[](std::size_t i) const { return data_[i]; }
 
-  //used by OrbitFlatTable
+  // used by OrbitFlatTable
   const std::vector<unsigned>& bxOffsets() const { return bxOffsets_; };
 
   // used by ROOT storage
   CMS_CLASS_VERSION(3)
 
-private:
+ private:
   // store data vector and BX offsets as flat vectors.
   // offset contains one entry per BX, indicating the starting index
   // of the objects for that BX.

@@ -5,9 +5,10 @@
 
 namespace l1sc {
 
-  GENERATE_SOA_LAYOUT(W3PiTableLayout, SOA_COLUMN(uint32_t, i), SOA_COLUMN(uint32_t, j), SOA_COLUMN(uint32_t, k))
+GENERATE_SOA_LAYOUT(W3PiTableLayout, SOA_COLUMN(uint32_t, i),
+                    SOA_COLUMN(uint32_t, j), SOA_COLUMN(uint32_t, k))
 
-  using W3PiTable = W3PiTableLayout<>;
+using W3PiTable = W3PiTableLayout<>;
 
 }  // namespace l1sc
 

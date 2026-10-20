@@ -1,37 +1,36 @@
-#include "FWCore/Framework/interface/MakerMacros.h"
-
+#include <cmath>
 #include <fstream>
 #include <iomanip>
 #include <memory>
 #include <string>
-#include <cmath>
 
-#include "FWCore/Framework/interface/global/EDProducer.h"
+#include "DataFormats/L1ScoutingSoA/interface/AssociationMapHost.h"
+#include "DataFormats/L1ScoutingSoA/interface/BxLookupHost.h"
+#include "DataFormats/L1ScoutingSoA/interface/ClustersHostCollection.h"
+#include "DataFormats/NanoAOD/interface/FlatTable.h"
 #include "FWCore/Framework/interface/Event.h"
+#include "FWCore/Framework/interface/EventSetup.h"
+#include "FWCore/Framework/interface/Frameworkfwd.h"
+#include "FWCore/Framework/interface/MakerMacros.h"
+#include "FWCore/Framework/interface/global/EDProducer.h"
+#include "FWCore/MessageLogger/interface/MessageDrop.h"
+#include "FWCore/MessageLogger/interface/MessageLogger.h"
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
 #include "FWCore/Utilities/interface/EDGetToken.h"
 #include "FWCore/Utilities/interface/InputTag.h"
-#include "FWCore/Framework/interface/EventSetup.h"
-#include "FWCore/Framework/interface/Frameworkfwd.h"
-#include "FWCore/MessageLogger/interface/MessageLogger.h"
-#include "FWCore/MessageLogger/interface/MessageDrop.h"
-
-#include "DataFormats/NanoAOD/interface/FlatTable.h"
-#include "DataFormats/L1ScoutingSoA/interface/BxLookupHost.h"
-#include "DataFormats/L1ScoutingSoA/interface/ClustersHostCollection.h"
-#include "DataFormats/L1ScoutingSoA/interface/AssociationMapHost.h"
 
 class ClusterSoAToNanoAODFlatTable : public edm::global::EDProducer<> {
-public:
+ public:
   // constructor and destructor
   explicit ClusterSoAToNanoAODFlatTable(const edm::ParameterSet&);
   ~ClusterSoAToNanoAODFlatTable() override {};
 
-  void produce(edm::StreamID, edm::Event&, edm::EventSetup const&) const override;
+  void produce(edm::StreamID, edm::Event&,
+               edm::EventSetup const&) const override;
 
   static void fillDescriptions(edm::ConfigurationDescriptions& descriptions);
 
-private:
+ private:
   // the tokens to access the data
   edm::EDGetTokenT<l1sc::ClustersHostCollection> srcClusters_;
 
@@ -42,8 +41,10 @@ private:
 
 // -------------------------------- constructor  -------------------------------
 
-ClusterSoAToNanoAODFlatTable::ClusterSoAToNanoAODFlatTable(const edm::ParameterSet& iConfig)
-    : srcClusters_(consumes<l1sc::ClustersHostCollection>(iConfig.getParameter<edm::InputTag>("srcClusters"))),
+ClusterSoAToNanoAODFlatTable::ClusterSoAToNanoAODFlatTable(
+    const edm::ParameterSet& iConfig)
+    : srcClusters_(consumes<l1sc::ClustersHostCollection>(
+          iConfig.getParameter<edm::InputTag>("srcClusters"))),
       name_(iConfig.getParameter<std::string>("name")),
       clustering_name_(iConfig.getParameter<std::string>("clustering_name")),
       doc_(iConfig.getParameter<std::string>("doc")),
@@ -53,7 +54,8 @@ ClusterSoAToNanoAODFlatTable::ClusterSoAToNanoAODFlatTable(const edm::ParameterS
 // -----------------------------------------------------------------------------
 
 // ----------------------- method called for each orbit  -----------------------
-void ClusterSoAToNanoAODFlatTable::produce(edm::StreamID, edm::Event& iEvent, edm::EventSetup const&) const {
+void ClusterSoAToNanoAODFlatTable::produce(edm::StreamID, edm::Event& iEvent,
+                                           edm::EventSetup const&) const {
   edm::Handle<l1sc::ClustersHostCollection> srcClusters;
   iEvent.getByToken(srcClusters_, srcClusters);
 
@@ -63,14 +65,19 @@ void ClusterSoAToNanoAODFlatTable::produce(edm::StreamID, edm::Event& iEvent, ed
   std::vector<int32_t> clusters{cluster, cluster + nclusters};
   std::vector<int32_t> is_seed{seed, seed + nclusters};
 
-  auto out = std::make_unique<nanoaod::FlatTable>(clusters.size(), name_, /* singleton */ false, /* extension */ extension_);
+  auto out = std::make_unique<nanoaod::FlatTable>(clusters.size(), name_,
+                                                  /* singleton */ false,
+                                                  /* extension */ extension_);
   out->setDoc(doc_);
-  out->addColumn<int32_t>("clusterIndex" + clustering_name_, clusters, "associated cluster index for " + clustering_name_);
-  out->addColumn<int32_t>("isSeed" + clustering_name_, is_seed, "cluster used as seed for " + clustering_name_);
+  out->addColumn<int32_t>("clusterIndex" + clustering_name_, clusters,
+                          "associated cluster index for " + clustering_name_);
+  out->addColumn<int32_t>("isSeed" + clustering_name_, is_seed,
+                          "cluster used as seed for " + clustering_name_);
   iEvent.put(std::move(out));
 }
 
-void ClusterSoAToNanoAODFlatTable::fillDescriptions(edm::ConfigurationDescriptions& descriptions) {
+void ClusterSoAToNanoAODFlatTable::fillDescriptions(
+    edm::ConfigurationDescriptions& descriptions) {
   edm::ParameterSetDescription desc;
   desc.add<edm::InputTag>("srcClusters");
   desc.add<std::string>("name");

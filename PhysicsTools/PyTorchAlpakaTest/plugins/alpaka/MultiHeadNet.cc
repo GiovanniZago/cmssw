@@ -1,6 +1,6 @@
 #include "DataFormats/PortableTestObjects/interface/TestSoA.h"
-#include "DataFormats/PortableTestObjects/interface/alpaka/ParticleDeviceCollection.h"
 #include "DataFormats/PortableTestObjects/interface/alpaka/MultiHeadNetDeviceCollection.h"
+#include "DataFormats/PortableTestObjects/interface/alpaka/ParticleDeviceCollection.h"
 #include "FWCore/ParameterSet/interface/ConfigurationDescriptions.h"
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
 #include "FWCore/ParameterSet/interface/ParameterSetDescription.h"
@@ -16,54 +16,65 @@
 
 namespace ALPAKA_ACCELERATOR_NAMESPACE::torchtest {
 
-  class MultiHeadNet : public stream::FixedQueueEDProducer<> {
-  public:
-    MultiHeadNet(const edm::ParameterSet &params)
-        : FixedQueueEDProducer<>(params),
-          particles_token_(consumes(params.getParameter<edm::InputTag>("particles"))),
-          multi_head_net_token_{produces()},
-          model_(params.getParameter<edm::FileInPath>("model").fullPath()),
-          environment_{static_cast<::torchtest::Environment>(params.getUntrackedParameter<int>("environment"))} {}
+class MultiHeadNet : public stream::FixedQueueEDProducer<> {
+ public:
+  MultiHeadNet(const edm::ParameterSet& params)
+      : FixedQueueEDProducer<>(params),
+        particles_token_(
+            consumes(params.getParameter<edm::InputTag>("particles"))),
+        multi_head_net_token_{produces()},
+        model_(params.getParameter<edm::FileInPath>("model").fullPath()),
+        environment_{static_cast<::torchtest::Environment>(
+            params.getUntrackedParameter<int>("environment"))} {}
 
-    static void fillDescriptions(edm::ConfigurationDescriptions &descriptions) {
-      edm::ParameterSetDescription desc;
-      desc.add<edm::FileInPath>("model");
-      desc.add<edm::InputTag>("particles");
-      desc.addUntracked<int>("environment", static_cast<int>(::torchtest::Environment::kProduction));
-      descriptions.addWithDefaultLabel(desc);
-    }
+  static void fillDescriptions(edm::ConfigurationDescriptions& descriptions) {
+    edm::ParameterSetDescription desc;
+    desc.add<edm::FileInPath>("model");
+    desc.add<edm::InputTag>("particles");
+    desc.addUntracked<int>(
+        "environment", static_cast<int>(::torchtest::Environment::kProduction));
+    descriptions.addWithDefaultLabel(desc);
+  }
 
-    void produce(device::Event &event, const device::EventSetup &event_setup) override {
-      // in/out collections
-      const auto &particles = event.get(particles_token_);
-      const auto total_size = particles.const_view().metadata().size();
-      auto multi_head_output = portabletest::MultiHeadNetDeviceCollection(event.queue(), total_size);
+  void produce(device::Event& event,
+               const device::EventSetup& event_setup) override {
+    // in/out collections
+    const auto& particles = event.get(particles_token_);
+    const auto total_size = particles.const_view().metadata().size();
+    auto multi_head_output =
+        portabletest::MultiHeadNetDeviceCollection(event.queue(), total_size);
 
-      // records
-      auto input_records = particles.const_view().records();
-      auto output_records = multi_head_output.view().records();
-      // input tensor definition
-      cms::torch::alpakatools::TensorCollection<Queue> inputs;
-      inputs.add<portabletest::ParticleSoA>("particles", input_records.pt(), input_records.eta(), input_records.phi());
-      // output tensor definition
-      cms::torch::alpakatools::TensorCollection<Queue> outputs;
-      outputs.add<portabletest::MultiHeadNetSoA>("regression_head", output_records.regression_head());
-      outputs.add<portabletest::MultiHeadNetSoA>("classification_head", output_records.classification_head());
+    // records
+    auto input_records = particles.const_view().records();
+    auto output_records = multi_head_output.view().records();
+    // input tensor definition
+    cms::torch::alpakatools::TensorCollection<Queue> inputs;
+    inputs.add<portabletest::ParticleSoA>("particles", input_records.pt(),
+                                          input_records.eta(),
+                                          input_records.phi());
+    // output tensor definition
+    cms::torch::alpakatools::TensorCollection<Queue> outputs;
+    outputs.add<portabletest::MultiHeadNetSoA>(
+        "regression_head", output_records.regression_head());
+    outputs.add<portabletest::MultiHeadNetSoA>(
+        "classification_head", output_records.classification_head());
 
-      model_.forward(event.queue(), inputs, outputs);
-      // put device-side product into event
-      event.emplace(multi_head_net_token_, std::move(multi_head_output));
-    }
+    model_.forward(event.queue(), inputs, outputs);
+    // put device-side product into event
+    event.emplace(multi_head_net_token_, std::move(multi_head_output));
+  }
 
-  private:
-    // event query tokens
-    const device::EDGetToken<portabletest::ParticleDeviceCollection> particles_token_;
-    const device::EDPutToken<portabletest::MultiHeadNetDeviceCollection> multi_head_net_token_;
-    // model
-    torch::AlpakaModel model_;
-    // debug mode flag
-    const ::torchtest::Environment environment_;
-  };
+ private:
+  // event query tokens
+  const device::EDGetToken<portabletest::ParticleDeviceCollection>
+      particles_token_;
+  const device::EDPutToken<portabletest::MultiHeadNetDeviceCollection>
+      multi_head_net_token_;
+  // model
+  torch::AlpakaModel model_;
+  // debug mode flag
+  const ::torchtest::Environment environment_;
+};
 
 }  // namespace ALPAKA_ACCELERATOR_NAMESPACE::torchtest
 

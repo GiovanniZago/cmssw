@@ -1,36 +1,42 @@
 #ifndef EventFilter_Utilities_DAQSourceModelsScoutingPhase2_h
 #define EventFilter_Utilities_DAQSourceModelsScoutingPhase2_h
 
-#include "EventFilter/Utilities/interface/DAQSource.h"
-#include "EventFilter/Utilities/interface/DAQSourceModels.h"
-#include "DataFormats/L1ScoutingRawData/interface/SDSRawDataCollection.h"
-#include "DataFormats/L1ScoutingRawData/interface/SDSNumbering.h"
-
-#include "FWCore/Framework/interface/Event.h"
-#include "DataFormats/Provenance/interface/EventAuxiliary.h"
-#include "DataFormats/Provenance/interface/EventID.h"
-
 #include <sys/types.h>
+
 #include <filesystem>
-#include <sstream>
 #include <iostream>
 #include <memory>
+#include <sstream>
 #include <vector>
 
+#include "DataFormats/L1ScoutingRawData/interface/SDSNumbering.h"
+#include "DataFormats/L1ScoutingRawData/interface/SDSRawDataCollection.h"
+#include "DataFormats/Provenance/interface/EventAuxiliary.h"
+#include "DataFormats/Provenance/interface/EventID.h"
+#include "EventFilter/Utilities/interface/DAQSource.h"
+#include "EventFilter/Utilities/interface/DAQSourceModels.h"
+#include "FWCore/Framework/interface/Event.h"
+
 class DataModeScoutingPhase2 : public DataMode {
-public:
+ public:
   DataModeScoutingPhase2(DAQSource* daqSource) : DataMode(daqSource) {}
   ~DataModeScoutingPhase2() override {}
-  std::vector<std::shared_ptr<const edm::DaqProvenanceHelper>>& makeDaqProvenanceHelpers() override;
+  std::vector<std::shared_ptr<const edm::DaqProvenanceHelper>>&
+  makeDaqProvenanceHelpers() override;
   void readEvent(edm::EventPrincipal& eventPrincipal) override;
 
-  //reuse FRD file and event headers
+  // reuse FRD file and event headers
   int dataVersion() const override { return detectedFRDversion_; }
-  void detectVersion(unsigned char* fileBuf, uint32_t fileHeaderOffset) override {
+  void detectVersion(unsigned char* fileBuf,
+                     uint32_t fileHeaderOffset) override {
     detectedFRDversion_ = *((uint16_t*)(fileBuf + fileHeaderOffset));
   }
-  uint32_t headerSize() const override { return edm::streamer::FRDHeaderVersionSize[detectedFRDversion_]; }
-  bool versionCheck() const override { return detectedFRDversion_ <= edm::streamer::FRDHeaderMaxVersion; }
+  uint32_t headerSize() const override {
+    return edm::streamer::FRDHeaderVersionSize[detectedFRDversion_];
+  }
+  bool versionCheck() const override {
+    return detectedFRDversion_ <= edm::streamer::FRDHeaderMaxVersion;
+  }
 
   uint64_t dataBlockSize() const override {
     // get event size from the first data source (main)
@@ -49,7 +55,7 @@ public:
       completedBlocks_.push_back(false);
     }
 
-    //add offset address for each file payload
+    // add offset address for each file payload
     dataBlockAddrs_.clear();
     dataBlockAddrs_.push_back(addr);
     dataBlockMaxAddrs_.clear();
@@ -63,7 +69,7 @@ public:
 
     dataBlockMax_ = rawFile->currentChunkSize();
     blockCompleted_ = false;
-    //set event cached as we set initial address here
+    // set event cached as we set initial address here
     bool result = makeEvents();
     assert(result);
     eventCached_ = true;
@@ -89,9 +95,14 @@ public:
 
   bool dataBlockInitialized() const override { return dataBlockInitialized_; }
 
-  void setDataBlockInitialized(bool val) override { dataBlockInitialized_ = val; };
+  void setDataBlockInitialized(bool val) override {
+    dataBlockInitialized_ = val;
+  };
 
-  void setTCDSSearchRange(uint16_t MINTCDSuTCAFEDID, uint16_t MAXTCDSuTCAFEDID) override { return; }
+  void setTCDSSearchRange(uint16_t MINTCDSuTCAFEDID,
+                          uint16_t MAXTCDSuTCAFEDID) override {
+    return;
+  }
 
   void makeDirectoryEntries(std::vector<std::string> const& baseDirs,
                             std::vector<int> const& numSources,
@@ -99,12 +110,13 @@ public:
                             std::string const& sourceIdentifier,
                             std::string const& runDir) override;
 
-  std::pair<bool, std::vector<std::string>> defineAdditionalFiles(std::string const& primaryName,
-                                                                  bool fileListMode) const override;
+  std::pair<bool, std::vector<std::string>> defineAdditionalFiles(
+      std::string const& primaryName, bool fileListMode) const override;
 
-private:
+ private:
   bool makeEvents();
-  std::vector<std::shared_ptr<const edm::DaqProvenanceHelper>> daqProvenanceHelpers_;  //
+  std::vector<std::shared_ptr<const edm::DaqProvenanceHelper>>
+      daqProvenanceHelpers_;  //
   uint16_t detectedFRDversion_ = 0;
   size_t fileHeaderSize_ = 0;
   size_t headerSize_ = 0;

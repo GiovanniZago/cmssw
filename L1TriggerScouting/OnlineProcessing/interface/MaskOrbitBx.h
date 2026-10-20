@@ -14,19 +14,19 @@
 #include "FWCore/Utilities/interface/StreamID.h"
 
 // L1 scouting
-#include "DataFormats/L1Scouting/interface/OrbitCollection.h"
-
-#include <vector>
 #include <set>
+#include <vector>
+
+#include "DataFormats/L1Scouting/interface/OrbitCollection.h"
 
 template <typename T>
 class MaskOrbitBx : public edm::stream::EDProducer<> {
-public:
+ public:
   explicit MaskOrbitBx(const edm::ParameterSet&);
   ~MaskOrbitBx() override {}
   static void fillDescriptions(edm::ConfigurationDescriptions&);
 
-private:
+ private:
   void produce(edm::Event&, const edm::EventSetup&) override;
 
   std::vector<std::vector<T>> orbitBuffer_;
@@ -44,14 +44,17 @@ private:
 
 template <typename T>
 MaskOrbitBx<T>::MaskOrbitBx(const edm::ParameterSet& iPSet)
-    : tokenData_(consumes<OrbitCollection<T>>(iPSet.getParameter<edm::InputTag>("dataTag"))),
-      tokenSelBxs_(consumes<std::vector<unsigned>>(iPSet.getParameter<edm::InputTag>("selectBxs"))),
+    : tokenData_(consumes<OrbitCollection<T>>(
+          iPSet.getParameter<edm::InputTag>("dataTag"))),
+      tokenSelBxs_(consumes<std::vector<unsigned>>(
+          iPSet.getParameter<edm::InputTag>("selectBxs"))),
       productLabel_(iPSet.getParameter<std::string>("productLabel")) {
   // prepare module buffer
   orbitBuffer_ = std::vector<std::vector<T>>(NBX);
 
   // products
-  produces<OrbitCollection<T>>(productLabel_).setBranchAlias(productLabel_ + "OrbitCollection");
+  produces<OrbitCollection<T>>(productLabel_)
+      .setBranchAlias(productLabel_ + "OrbitCollection");
 }
 
 // ------------ method called for each ORBIT  ------------
@@ -87,7 +90,8 @@ void MaskOrbitBx<T>::produce(edm::Event& iEvent, const edm::EventSetup&) {
 }  // end produce
 
 template <typename T>
-void MaskOrbitBx<T>::fillDescriptions(edm::ConfigurationDescriptions& descriptions) {
+void MaskOrbitBx<T>::fillDescriptions(
+    edm::ConfigurationDescriptions& descriptions) {
   edm::ParameterSetDescription desc;
   desc.add<edm::InputTag>("dataTag");
   desc.add<edm::InputTag>("selectBxs");

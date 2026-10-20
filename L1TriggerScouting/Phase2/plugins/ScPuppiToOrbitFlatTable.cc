@@ -1,36 +1,35 @@
-#include "FWCore/Framework/interface/MakerMacros.h"
-
+#include <cmath>
 #include <fstream>
 #include <iomanip>
 #include <memory>
 #include <string>
-#include <cmath>
-
-#include "FWCore/Framework/interface/global/EDProducer.h"
-#include "FWCore/Framework/interface/Event.h"
-#include "FWCore/ParameterSet/interface/ParameterSet.h"
-#include "FWCore/Utilities/interface/EDGetToken.h"
-#include "FWCore/Utilities/interface/InputTag.h"
-#include "FWCore/Framework/interface/EventSetup.h"
-#include "FWCore/Framework/interface/Frameworkfwd.h"
-#include "FWCore/MessageLogger/interface/MessageLogger.h"
-#include "FWCore/MessageLogger/interface/MessageDrop.h"
 
 #include "DataFormats/L1Scouting/interface/OrbitCollection.h"
 #include "DataFormats/L1TParticleFlow/interface/L1ScoutingPuppi.h"
 #include "DataFormats/NanoAOD/interface/OrbitFlatTable.h"
+#include "FWCore/Framework/interface/Event.h"
+#include "FWCore/Framework/interface/EventSetup.h"
+#include "FWCore/Framework/interface/Frameworkfwd.h"
+#include "FWCore/Framework/interface/MakerMacros.h"
+#include "FWCore/Framework/interface/global/EDProducer.h"
+#include "FWCore/MessageLogger/interface/MessageDrop.h"
+#include "FWCore/MessageLogger/interface/MessageLogger.h"
+#include "FWCore/ParameterSet/interface/ParameterSet.h"
+#include "FWCore/Utilities/interface/EDGetToken.h"
+#include "FWCore/Utilities/interface/InputTag.h"
 
 class ScPuppiToOrbitFlatTable : public edm::global::EDProducer<> {
-public:
+ public:
   // constructor and destructor
   explicit ScPuppiToOrbitFlatTable(const edm::ParameterSet&);
   ~ScPuppiToOrbitFlatTable() override {};
 
-  void produce(edm::StreamID, edm::Event&, edm::EventSetup const&) const override;
+  void produce(edm::StreamID, edm::Event&,
+               edm::EventSetup const&) const override;
 
   static void fillDescriptions(edm::ConfigurationDescriptions& descriptions);
 
-private:
+ private:
   // the tokens to access the data
   edm::EDGetTokenT<OrbitCollection<l1Scouting::Puppi>> src_;
 
@@ -40,8 +39,10 @@ private:
 
 // -------------------------------- constructor  -------------------------------
 
-ScPuppiToOrbitFlatTable::ScPuppiToOrbitFlatTable(const edm::ParameterSet& iConfig)
-    : src_(consumes<OrbitCollection<l1Scouting::Puppi>>(iConfig.getParameter<edm::InputTag>("src"))),
+ScPuppiToOrbitFlatTable::ScPuppiToOrbitFlatTable(
+    const edm::ParameterSet& iConfig)
+    : src_(consumes<OrbitCollection<l1Scouting::Puppi>>(
+          iConfig.getParameter<edm::InputTag>("src"))),
       name_(iConfig.getParameter<std::string>("name")),
       doc_(iConfig.getParameter<std::string>("doc")) {
   produces<l1ScoutingRun3::OrbitFlatTable>();
@@ -49,13 +50,15 @@ ScPuppiToOrbitFlatTable::ScPuppiToOrbitFlatTable(const edm::ParameterSet& iConfi
 // -----------------------------------------------------------------------------
 
 // ----------------------- method called for each orbit  -----------------------
-void ScPuppiToOrbitFlatTable::produce(edm::StreamID, edm::Event& iEvent, edm::EventSetup const&) const {
+void ScPuppiToOrbitFlatTable::produce(edm::StreamID, edm::Event& iEvent,
+                                      edm::EventSetup const&) const {
   edm::Handle<OrbitCollection<l1Scouting::Puppi>> src;
   iEvent.getByToken(src_, src);
-  auto out = std::make_unique<l1ScoutingRun3::OrbitFlatTable>(src->bxOffsets(), name_);
+  auto out =
+      std::make_unique<l1ScoutingRun3::OrbitFlatTable>(src->bxOffsets(), name_);
   out->setDoc(doc_);
-  std::vector<float> pt(out->size()), eta(out->size()), phi(out->size()), z0(out->size()), dxy(out->size()),
-      puppiw(out->size());
+  std::vector<float> pt(out->size()), eta(out->size()), phi(out->size()),
+      z0(out->size()), dxy(out->size()), puppiw(out->size());
   std::vector<int16_t> pdgId(out->size());
   std::vector<uint8_t> quality(out->size());
   unsigned int i = 0;
@@ -81,7 +84,8 @@ void ScPuppiToOrbitFlatTable::produce(edm::StreamID, edm::Event& iEvent, edm::Ev
   iEvent.put(std::move(out));
 }
 
-void ScPuppiToOrbitFlatTable::fillDescriptions(edm::ConfigurationDescriptions& descriptions) {
+void ScPuppiToOrbitFlatTable::fillDescriptions(
+    edm::ConfigurationDescriptions& descriptions) {
   edm::ParameterSetDescription desc;
 
   desc.add<edm::InputTag>("src");

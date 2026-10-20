@@ -6,8 +6,8 @@
 
 namespace torchportabletest {
 
-  using MaskHost = PortableHostCollection<Mask>;
-  using ScalarMaskHost = PortableHostCollection<ScalarMask>;
+using MaskHost = PortableHostCollection<Mask>;
+using ScalarMaskHost = PortableHostCollection<ScalarMask>;
 
 }  // namespace torchportabletest
 
