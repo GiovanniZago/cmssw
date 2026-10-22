@@ -1,0 +1,1072 @@
+#ifndef L1TriggerScouting_TauTagging_plugins_alpaka_STTSofieKernels_h
+#define L1TriggerScouting_TauTagging_plugins_alpaka_STTSofieKernels_h
+
+#include <algorithm>
+#include <memory>
+#include <cmath>
+#include <vector>
+#include <alpaka/alpaka.hpp>
+#include <sofieBLAS/sofieBLAS.hpp>
+#include <span>
+#include "SOFIE/SOFIE_common.hxx"
+#include <fstream>
+
+#ifndef SOFIE_ALPAKA_DIM1D_DEFINED
+#define SOFIE_ALPAKA_DIM1D_DEFINED
+using Dim1D = alpaka::DimInt<1>;
+#endif // SOFIE_ALPAKA_DIM1D_DEFINED
+
+#ifndef SOFIE_ALPAKA_WORKDIV_DEFINED
+#define SOFIE_ALPAKA_WORKDIV_DEFINED
+template<typename TDim, typename TIdx>
+inline alpaka::WorkDivMembers<TDim, TIdx> sofie_workdiv(
+    alpaka::Vec<TDim, TIdx> const& numElems, TIdx blockSz = TIdx{256})
+{
+    auto const numBlocks = alpaka::Vec<TDim, TIdx>::all(
+        std::max(TIdx{1}, (numElems[0] + blockSz - TIdx{1}) / blockSz));
+    return alpaka::WorkDivMembers<TDim, TIdx>(
+        numBlocks,
+        alpaka::Vec<TDim, TIdx>::all(blockSz),
+        alpaka::Vec<TDim, TIdx>::all(TIdx{1}));
+}
+#endif // SOFIE_ALPAKA_WORKDIV_DEFINED
+
+#ifndef SOFIE_ALPAKA_DEVICE_MATH_DEFINED
+#define SOFIE_ALPAKA_DEVICE_MATH_DEFINED
+#if defined(__CUDA_ARCH__)
+#define SOFIE_DEVICE_exp(acc, ...) ::exp(__VA_ARGS__)
+#define SOFIE_DEVICE_sqrt(acc, ...) ::sqrt(__VA_ARGS__)
+#define SOFIE_DEVICE_log(acc, ...) ::log(__VA_ARGS__)
+#define SOFIE_DEVICE_sin(acc, ...) ::sin(__VA_ARGS__)
+#define SOFIE_DEVICE_cos(acc, ...) ::cos(__VA_ARGS__)
+#define SOFIE_DEVICE_abs(acc, ...) ::abs(__VA_ARGS__)
+#define SOFIE_DEVICE_pow(acc, ...) ::pow(__VA_ARGS__)
+#define SOFIE_DEVICE_atan2(acc, ...) ::atan2(__VA_ARGS__)
+#define SOFIE_DEVICE_atan(acc, ...) ::atan(__VA_ARGS__)
+#define SOFIE_DEVICE_floor(acc, ...) ::floor(__VA_ARGS__)
+#define SOFIE_DEVICE_ceil(acc, ...) ::ceil(__VA_ARGS__)
+#define SOFIE_DEVICE_round(acc, ...) ::round(__VA_ARGS__)
+#define SOFIE_DEVICE_cbrt(acc, ...) ::cbrt(__VA_ARGS__)
+#define SOFIE_DEVICE_tanh(acc, ...) ::tanh(__VA_ARGS__)
+#define SOFIE_DEVICE_sinh(acc, ...) ::sinh(__VA_ARGS__)
+#define SOFIE_DEVICE_cosh(acc, ...) ::cosh(__VA_ARGS__)
+#else
+#define SOFIE_DEVICE_exp(acc, ...) exp(acc, __VA_ARGS__)
+#define SOFIE_DEVICE_sqrt(acc, ...) sqrt(acc, __VA_ARGS__)
+#define SOFIE_DEVICE_log(acc, ...) log(acc, __VA_ARGS__)
+#define SOFIE_DEVICE_sin(acc, ...) sin(acc, __VA_ARGS__)
+#define SOFIE_DEVICE_cos(acc, ...) cos(acc, __VA_ARGS__)
+#define SOFIE_DEVICE_abs(acc, ...) abs(acc, __VA_ARGS__)
+#define SOFIE_DEVICE_pow(acc, ...) pow(acc, __VA_ARGS__)
+#define SOFIE_DEVICE_atan2(acc, ...) atan2(acc, __VA_ARGS__)
+#define SOFIE_DEVICE_atan(acc, ...) atan(acc, __VA_ARGS__)
+#define SOFIE_DEVICE_floor(acc, ...) floor(acc, __VA_ARGS__)
+#define SOFIE_DEVICE_ceil(acc, ...) ceil(acc, __VA_ARGS__)
+#define SOFIE_DEVICE_round(acc, ...) round(acc, __VA_ARGS__)
+#define SOFIE_DEVICE_cbrt(acc, ...) cbrt(acc, __VA_ARGS__)
+#define SOFIE_DEVICE_tanh(acc, ...) tanh(acc, __VA_ARGS__)
+#define SOFIE_DEVICE_sinh(acc, ...) sinh(acc, __VA_ARGS__)
+#define SOFIE_DEVICE_cosh(acc, ...) cosh(acc, __VA_ARGS__)
+#endif // __CUDA_ARCH__
+#endif // SOFIE_ALPAKA_DEVICE_MATH_DEFINED
+
+namespace ALPAKA_ACCELERATOR_NAMESPACE::l1sc::SOFIE_STT_ort_relu_fp32_b2048_s16 {
+
+template <typename tagAcc>
+struct Session {
+
+using Idx = std::size_t;
+using Dim = alpaka::DimInt<1>;
+using Acc = alpaka::TagToAcc<tagAcc, Dim, Idx>;
+using DevAcc = alpaka::Dev<Acc>;
+
+using QueueProperty = alpaka::NonBlocking;
+using QueueAcc = alpaka::Queue<Acc, QueueProperty>;
+
+using BufF1D = alpaka::Buf<Acc, float, Dim, Idx>;
+using BufD1D = alpaka::Buf<Acc, double, Dim, Idx>;
+using BufI321D = alpaka::Buf<Acc, int32_t, Dim, Idx>;
+using BufI641D = alpaka::Buf<Acc, int64_t, Dim, Idx>;
+using BufUI81D = alpaka::Buf<Acc, uint8_t, Dim, Idx>;
+
+// Non-owning device view types (ViewPlainPtr) for the span-based infer interface
+using ViewF1D = alpaka::ViewPlainPtr<DevAcc, float, Dim, Idx>;
+using ViewConstF1D = alpaka::ViewPlainPtr<DevAcc, const float, Dim, Idx>;
+using ViewD1D = alpaka::ViewPlainPtr<DevAcc, double, Dim, Idx>;
+using ViewConstD1D = alpaka::ViewPlainPtr<DevAcc, const double, Dim, Idx>;
+using ViewI321D = alpaka::ViewPlainPtr<DevAcc, int32_t, Dim, Idx>;
+using ViewConstI321D = alpaka::ViewPlainPtr<DevAcc, const int32_t, Dim, Idx>;
+using ViewI641D = alpaka::ViewPlainPtr<DevAcc, int64_t, Dim, Idx>;
+using ViewConstI641D = alpaka::ViewPlainPtr<DevAcc, const int64_t, Dim, Idx>;
+using ViewUI81D = alpaka::ViewPlainPtr<DevAcc, uint8_t, Dim, Idx>;
+using ViewConstUI81D = alpaka::ViewPlainPtr<DevAcc, const uint8_t, Dim, Idx>;
+
+
+alpaka::Platform<Acc> const platform{};
+DevAcc devAcc = alpaka::getDevByIdx(platform, 0);
+alpaka::PlatformCpu platformHost{};
+alpaka::DevCpu hostAcc = alpaka::getDevByIdx(platformHost, 0);
+QueueAcc queue{devAcc};
+Idx threadsPerBlock = 256;
+
+using Ext1D = alpaka::Vec<Dim, Idx>;
+using Vec = alpaka::Vec<Dim, Idx>;
+
+
+// BLAS declarations
+sofieBLAS<tagAcc> blas{queue};
+
+// initialized tensors for weights
+int64_t tensor_val_32[3] = { 16, 16384, 16};
+BufI641D deviceBuf_val_32 = alpaka::allocBuf<int64_t, Idx>(devAcc, Ext1D::all(Idx{3}));
+int64_t tensor_val_30[1] = { 16384};
+BufI641D deviceBuf_val_30 = alpaka::allocBuf<int64_t, Idx>(devAcc, Ext1D::all(Idx{1}));
+BufF1D deviceBuf_modelprojection_layerlinear_classifierweight = alpaka::allocBuf<float, Idx>(devAcc, Ext1D::all(Idx{32}));
+int64_t tensor_val_2[1] = { 1};
+BufI641D deviceBuf_val_2 = alpaka::allocBuf<int64_t, Idx>(devAcc, Ext1D::all(Idx{1}));
+int64_t tensor_val_52[3] = { 16, 2048, 128};
+BufI641D deviceBuf_val_52 = alpaka::allocBuf<int64_t, Idx>(devAcc, Ext1D::all(Idx{3}));
+BufF1D deviceBuf_val_43 = alpaka::allocBuf<float, Idx>(devAcc, Ext1D::all(Idx{1}));
+int64_t tensor_sym_size_int_2[1] = { 2048};
+BufI641D deviceBuf_sym_size_int_2 = alpaka::allocBuf<int64_t, Idx>(devAcc, Ext1D::all(Idx{1}));
+BufF1D deviceBuf_modelprojection_layerlinear1bias = alpaka::allocBuf<float, Idx>(devAcc, Ext1D::all(Idx{64}));
+BufF1D deviceBuf_modelprojection_layerlinear1weight = alpaka::allocBuf<float, Idx>(devAcc, Ext1D::all(Idx{8192}));
+BufF1D deviceBuf_modelparticle_embedembed6weight = alpaka::allocBuf<float, Idx>(devAcc, Ext1D::all(Idx{512}));
+BufF1D deviceBuf_modelencodernormalpha = alpaka::allocBuf<float, Idx>(devAcc, Ext1D::all(Idx{1}));
+BufF1D deviceBuf_val_9 = alpaka::allocBuf<float, Idx>(devAcc, Ext1D::all(Idx{65536}));
+BufF1D deviceBuf_modelencoderlayers0residual_connections1normbias = alpaka::allocBuf<float, Idx>(devAcc, Ext1D::all(Idx{1}));
+BufF1D deviceBuf_modelparticle_embedembed3weight = alpaka::allocBuf<float, Idx>(devAcc, Ext1D::all(Idx{128}));
+BufF1D deviceBuf_modelparticle_embedembed0weight = alpaka::allocBuf<float, Idx>(devAcc, Ext1D::all(Idx{10}));
+BufF1D deviceBuf_modelprojection_layerpooling_layerscore_layer2bias = alpaka::allocBuf<float, Idx>(devAcc, Ext1D::all(Idx{1}));
+BufF1D deviceBuf_modelparticle_embedembed0bias = alpaka::allocBuf<float, Idx>(devAcc, Ext1D::all(Idx{10}));
+BufF1D deviceBuf_modelparticle_embedembed1bias = alpaka::allocBuf<float, Idx>(devAcc, Ext1D::all(Idx{128}));
+BufF1D deviceBuf_modelencodernormbias = alpaka::allocBuf<float, Idx>(devAcc, Ext1D::all(Idx{1}));
+BufF1D deviceBuf_modelprojection_layerlinear_chargeweight = alpaka::allocBuf<float, Idx>(devAcc, Ext1D::all(Idx{32}));
+BufF1D deviceBuf_modelprojection_layerlinear2bias = alpaka::allocBuf<float, Idx>(devAcc, Ext1D::all(Idx{32}));
+BufF1D deviceBuf_modelparticle_embedembed3bias = alpaka::allocBuf<float, Idx>(devAcc, Ext1D::all(Idx{128}));
+BufF1D deviceBuf_modelparticle_embedembed4bias = alpaka::allocBuf<float, Idx>(devAcc, Ext1D::all(Idx{512}));
+BufF1D deviceBuf_modelprojection_layerlinear2weight = alpaka::allocBuf<float, Idx>(devAcc, Ext1D::all(Idx{2048}));
+BufF1D deviceBuf_modelencoderlayers0residual_connections1normalpha = alpaka::allocBuf<float, Idx>(devAcc, Ext1D::all(Idx{1}));
+BufF1D deviceBuf_modelencoderlayers0self_attention_blockin_proj_bias = alpaka::allocBuf<float, Idx>(devAcc, Ext1D::all(Idx{384}));
+BufF1D deviceBuf_modelencoderlayers0residual_connections0normalpha = alpaka::allocBuf<float, Idx>(devAcc, Ext1D::all(Idx{1}));
+BufF1D deviceBuf_val_75 = alpaka::allocBuf<float, Idx>(devAcc, Ext1D::all(Idx{8192}));
+BufF1D deviceBuf_modelencoderlayers0self_attention_blockout_projbias = alpaka::allocBuf<float, Idx>(devAcc, Ext1D::all(Idx{128}));
+BufF1D deviceBuf_modelprojection_layerlinear_regressor_ptweight = alpaka::allocBuf<float, Idx>(devAcc, Ext1D::all(Idx{32}));
+BufF1D deviceBuf_val_66 = alpaka::allocBuf<float, Idx>(devAcc, Ext1D::all(Idx{65536}));
+int64_t tensor_val_81[2] = { -1, 128};
+BufI641D deviceBuf_val_81 = alpaka::allocBuf<int64_t, Idx>(devAcc, Ext1D::all(Idx{2}));
+BufF1D deviceBuf_val_56 = alpaka::allocBuf<float, Idx>(devAcc, Ext1D::all(Idx{1}));
+BufF1D deviceBuf_modelparticle_embedembed6bias = alpaka::allocBuf<float, Idx>(devAcc, Ext1D::all(Idx{512}));
+BufF1D deviceBuf_modelencoderlayers0feed_forward_blocklinear_1bias = alpaka::allocBuf<float, Idx>(devAcc, Ext1D::all(Idx{512}));
+BufF1D deviceBuf_modelprojection_layerlinear_classifierbias = alpaka::allocBuf<float, Idx>(devAcc, Ext1D::all(Idx{1}));
+int64_t tensor_val_25[1] = { 0};
+BufI641D deviceBuf_val_25 = alpaka::allocBuf<int64_t, Idx>(devAcc, Ext1D::all(Idx{1}));
+BufF1D deviceBuf_modelencoderlayers0residual_connections0normbias = alpaka::allocBuf<float, Idx>(devAcc, Ext1D::all(Idx{1}));
+BufF1D deviceBuf_modelprojection_layerlinear_chargebias = alpaka::allocBuf<float, Idx>(devAcc, Ext1D::all(Idx{1}));
+BufF1D deviceBuf_val_5 = alpaka::allocBuf<float, Idx>(devAcc, Ext1D::all(Idx{1280}));
+BufF1D deviceBuf_modelprojection_layerlinear_regressor_ptbias = alpaka::allocBuf<float, Idx>(devAcc, Ext1D::all(Idx{1}));
+BufF1D deviceBuf_val_13 = alpaka::allocBuf<float, Idx>(devAcc, Ext1D::all(Idx{65536}));
+BufF1D deviceBuf_val_15 = alpaka::allocBuf<float, Idx>(devAcc, Ext1D::all(Idx{49152}));
+int64_t tensor_val_55[1] = { -1};
+BufI641D deviceBuf_val_55 = alpaka::allocBuf<int64_t, Idx>(devAcc, Ext1D::all(Idx{1}));
+BufF1D deviceBuf_val_77 = alpaka::allocBuf<float, Idx>(devAcc, Ext1D::all(Idx{64}));
+int64_t tensor_mul_55[1] = { 16384};
+BufI641D deviceBuf_mul_55 = alpaka::allocBuf<int64_t, Idx>(devAcc, Ext1D::all(Idx{1}));
+int64_t tensor_val_80[4] = { -1, 1, 3, 128};
+BufI641D deviceBuf_val_80 = alpaka::allocBuf<int64_t, Idx>(devAcc, Ext1D::all(Idx{4}));
+BufF1D deviceBuf_modelencoderlayers0self_attention_blockout_projweight = alpaka::allocBuf<float, Idx>(devAcc, Ext1D::all(Idx{16384}));
+BufF1D deviceBuf_modelparticle_embedembed7bias = alpaka::allocBuf<float, Idx>(devAcc, Ext1D::all(Idx{128}));
+int64_t tensor_val_23[1] = { 0};
+BufI641D deviceBuf_val_23 = alpaka::allocBuf<int64_t, Idx>(devAcc, Ext1D::all(Idx{1}));
+int64_t tensor_val_31[1] = { 16};
+BufI641D deviceBuf_val_31 = alpaka::allocBuf<int64_t, Idx>(devAcc, Ext1D::all(Idx{1}));
+int64_t tensor_val_24[1] = { -2};
+BufI641D deviceBuf_val_24 = alpaka::allocBuf<int64_t, Idx>(devAcc, Ext1D::all(Idx{1}));
+int64_t tensor_val_26[1] = { 2};
+BufI641D deviceBuf_val_26 = alpaka::allocBuf<int64_t, Idx>(devAcc, Ext1D::all(Idx{1}));
+BufF1D deviceBuf_modelprojection_layerpooling_layerscore_layer0bias = alpaka::allocBuf<float, Idx>(devAcc, Ext1D::all(Idx{64}));
+int64_t tensor_val_27[1] = { 8};
+BufI641D deviceBuf_val_27 = alpaka::allocBuf<int64_t, Idx>(devAcc, Ext1D::all(Idx{1}));
+int64_t tensor_val_51[1] = { 128};
+BufI641D deviceBuf_val_51 = alpaka::allocBuf<int64_t, Idx>(devAcc, Ext1D::all(Idx{1}));
+BufF1D deviceBuf_val_59 = alpaka::allocBuf<float, Idx>(devAcc, Ext1D::all(Idx{1}));
+BufF1D deviceBuf_val_60 = alpaka::allocBuf<float, Idx>(devAcc, Ext1D::all(Idx{1}));
+BufF1D deviceBuf_modelencoderlayers0feed_forward_blocklinear_2bias = alpaka::allocBuf<float, Idx>(devAcc, Ext1D::all(Idx{128}));
+int64_t tensor_val_0[1] = { 2048};
+BufI641D deviceBuf_val_0 = alpaka::allocBuf<int64_t, Idx>(devAcc, Ext1D::all(Idx{1}));
+BufF1D deviceBuf_val_68 = alpaka::allocBuf<float, Idx>(devAcc, Ext1D::all(Idx{65536}));
+int64_t tensor_val_79[1] = { 1};
+BufI641D deviceBuf_val_79 = alpaka::allocBuf<int64_t, Idx>(devAcc, Ext1D::all(Idx{1}));
+int64_t tensor_val_1[1] = { 16};
+BufI641D deviceBuf_val_1 = alpaka::allocBuf<int64_t, Idx>(devAcc, Ext1D::all(Idx{1}));
+
+//--- declare intermediate tensors
+ViewF1D deviceBuf_reg_pt{static_cast<float*>(nullptr), devAcc, Ext1D::all(Idx{0})};
+ViewF1D deviceBuf_class_logit{static_cast<float*>(nullptr), devAcc, Ext1D::all(Idx{0})};
+ViewF1D deviceBuf_linear_12{static_cast<float*>(nullptr), devAcc, Ext1D::all(Idx{0})};
+ViewF1D deviceBuf_sum_1{static_cast<float*>(nullptr), devAcc, Ext1D::all(Idx{0})};
+ViewF1D deviceBuf_linear_8{static_cast<float*>(nullptr), devAcc, Ext1D::all(Idx{0})};
+ViewF1D deviceBuf_linear_7{static_cast<float*>(nullptr), devAcc, Ext1D::all(Idx{0})};
+ViewF1D deviceBuf_softmax_1{static_cast<float*>(nullptr), devAcc, Ext1D::all(Idx{0})};
+ViewF1D deviceBuf_sub_100{static_cast<float*>(nullptr), devAcc, Ext1D::all(Idx{0})};
+ViewF1D deviceBuf_transpose_4{static_cast<float*>(nullptr), devAcc, Ext1D::all(Idx{0})};
+ViewF1D deviceBuf_relu_4{static_cast<float*>(nullptr), devAcc, Ext1D::all(Idx{0})};
+ViewF1D deviceBuf_select{static_cast<float*>(nullptr), devAcc, Ext1D::all(Idx{0})};
+ViewF1D deviceBuf_relu_5{static_cast<float*>(nullptr), devAcc, Ext1D::all(Idx{0})};
+ViewF1D deviceBuf_select_2{static_cast<float*>(nullptr), devAcc, Ext1D::all(Idx{0})};
+ViewF1D deviceBuf_transpose_5{static_cast<float*>(nullptr), devAcc, Ext1D::all(Idx{0})};
+ViewF1D deviceBuf_select_1{static_cast<float*>(nullptr), devAcc, Ext1D::all(Idx{0})};
+ViewF1D deviceBuf_relu{static_cast<float*>(nullptr), devAcc, Ext1D::all(Idx{0})};
+ViewF1D deviceBuf_linear_13{static_cast<float*>(nullptr), devAcc, Ext1D::all(Idx{0})};
+ViewF1D deviceBuf_transpose_1{static_cast<float*>(nullptr), devAcc, Ext1D::all(Idx{0})};
+ViewF1D deviceBuf_transpose_6{static_cast<float*>(nullptr), devAcc, Ext1D::all(Idx{0})};
+ViewF1D deviceBuf_layer_norm{static_cast<float*>(nullptr), devAcc, Ext1D::all(Idx{0})};
+BufF1D deviceBuf_linear_1 = alpaka::allocBuf<float, Idx>(devAcc, Ext1D::all(Idx{16777216}));
+ViewF1D deviceBuf_softmax{static_cast<float*>(nullptr), devAcc, Ext1D::all(Idx{0})};
+ViewF1D deviceBuf_mul_74{static_cast<float*>(nullptr), devAcc, Ext1D::all(Idx{0})};
+BufF1D deviceBuf_linear = alpaka::allocBuf<float, Idx>(devAcc, Ext1D::all(Idx{4194304}));
+BufF1D deviceBuf_linear_5 = alpaka::allocBuf<float, Idx>(devAcc, Ext1D::all(Idx{16777216}));
+ViewF1D deviceBuf_charge_logit{static_cast<float*>(nullptr), devAcc, Ext1D::all(Idx{0})};
+ViewF1D deviceBuf_transpose{static_cast<float*>(nullptr), devAcc, Ext1D::all(Idx{0})};
+ViewF1D deviceBuf_bmm{static_cast<float*>(nullptr), devAcc, Ext1D::all(Idx{0})};
+BufF1D deviceBuf_linear_2 = alpaka::allocBuf<float, Idx>(devAcc, Ext1D::all(Idx{4194304}));
+ViewF1D deviceBuf_relu_3{static_cast<float*>(nullptr), devAcc, Ext1D::all(Idx{0})};
+ViewF1D deviceBuf_relu_2{static_cast<float*>(nullptr), devAcc, Ext1D::all(Idx{0})};
+ViewF1D deviceBuf_linear_11{static_cast<float*>(nullptr), devAcc, Ext1D::all(Idx{0})};
+ViewF1D deviceBuf_linear_6{static_cast<float*>(nullptr), devAcc, Ext1D::all(Idx{0})};
+ViewF1D deviceBuf_add_278{static_cast<float*>(nullptr), devAcc, Ext1D::all(Idx{0})};
+ViewF1D deviceBuf_layer_norm_1{static_cast<float*>(nullptr), devAcc, Ext1D::all(Idx{0})};
+ViewF1D deviceBuf_tanh{static_cast<float*>(nullptr), devAcc, Ext1D::all(Idx{0})};
+ViewF1D deviceBuf_relu_1{static_cast<float*>(nullptr), devAcc, Ext1D::all(Idx{0})};
+ViewF1D deviceBuf_div{static_cast<float*>(nullptr), devAcc, Ext1D::all(Idx{0})};
+ViewF1D deviceBuf_layer_norm_2{static_cast<float*>(nullptr), devAcc, Ext1D::all(Idx{0})};
+ViewF1D deviceBuf_linear_4{static_cast<float*>(nullptr), devAcc, Ext1D::all(Idx{0})};
+ViewF1D deviceBuf_mean{static_cast<float*>(nullptr), devAcc, Ext1D::all(Idx{0})};
+ViewF1D deviceBuf_transpose_7{static_cast<float*>(nullptr), devAcc, Ext1D::all(Idx{0})};
+ViewF1D deviceBuf_linear_3{static_cast<float*>(nullptr), devAcc, Ext1D::all(Idx{0})};
+ViewF1D deviceBuf_bmm_1{static_cast<float*>(nullptr), devAcc, Ext1D::all(Idx{0})};
+ViewF1D deviceBuf_add_189{static_cast<float*>(nullptr), devAcc, Ext1D::all(Idx{0})};
+ViewF1D deviceBuf_sub_81{static_cast<float*>(nullptr), devAcc, Ext1D::all(Idx{0})};
+ViewF1D deviceBuf_add_224{static_cast<float*>(nullptr), devAcc, Ext1D::all(Idx{0})};
+
+//--- unified memory pool buffer (allocated in constructor)
+BufUI81D fUnifiedPool = alpaka::allocBuf<uint8_t, Idx>(devAcc, Ext1D::all(Idx{1}));
+std::size_t fUnifiedPoolSize = 0;
+std::size_t GetIntermediateMemoryPoolSize() const { return fUnifiedPoolSize; }
+std::size_t GetLargestFreeBlock() const { return 0; }
+std::size_t GetTotalFreeMemory() const { return 0; }
+double GetFragmentation() const { return 0.0; }
+
+void InitSession(std::string filename) {
+// temporary initialized tensors for loading weights
+std::vector<float> tensor_modelprojection_layerlinear_classifierweight(32);
+std::vector<float> tensor_val_43(1);
+std::vector<float> tensor_modelprojection_layerlinear1bias(64);
+std::vector<float> tensor_modelprojection_layerlinear1weight(8192);
+std::vector<float> tensor_modelparticle_embedembed6weight(512);
+std::vector<float> tensor_modelencodernormalpha(1);
+std::vector<float> tensor_val_9(65536);
+std::vector<float> tensor_modelencoderlayers0residual_connections1normbias(1);
+std::vector<float> tensor_modelparticle_embedembed3weight(128);
+std::vector<float> tensor_modelparticle_embedembed0weight(10);
+std::vector<float> tensor_modelprojection_layerpooling_layerscore_layer2bias(1);
+std::vector<float> tensor_modelparticle_embedembed0bias(10);
+std::vector<float> tensor_modelparticle_embedembed1bias(128);
+std::vector<float> tensor_modelencodernormbias(1);
+std::vector<float> tensor_modelprojection_layerlinear_chargeweight(32);
+std::vector<float> tensor_modelprojection_layerlinear2bias(32);
+std::vector<float> tensor_modelparticle_embedembed3bias(128);
+std::vector<float> tensor_modelparticle_embedembed4bias(512);
+std::vector<float> tensor_modelprojection_layerlinear2weight(2048);
+std::vector<float> tensor_modelencoderlayers0residual_connections1normalpha(1);
+std::vector<float> tensor_modelencoderlayers0self_attention_blockin_proj_bias(384);
+std::vector<float> tensor_modelencoderlayers0residual_connections0normalpha(1);
+std::vector<float> tensor_val_75(8192);
+std::vector<float> tensor_modelencoderlayers0self_attention_blockout_projbias(128);
+std::vector<float> tensor_modelprojection_layerlinear_regressor_ptweight(32);
+std::vector<float> tensor_val_66(65536);
+std::vector<float> tensor_val_56(1);
+std::vector<float> tensor_modelparticle_embedembed6bias(512);
+std::vector<float> tensor_modelencoderlayers0feed_forward_blocklinear_1bias(512);
+std::vector<float> tensor_modelprojection_layerlinear_classifierbias(1);
+std::vector<float> tensor_modelencoderlayers0residual_connections0normbias(1);
+std::vector<float> tensor_modelprojection_layerlinear_chargebias(1);
+std::vector<float> tensor_val_5(1280);
+std::vector<float> tensor_modelprojection_layerlinear_regressor_ptbias(1);
+std::vector<float> tensor_val_13(65536);
+std::vector<float> tensor_val_15(49152);
+std::vector<float> tensor_val_77(64);
+std::vector<float> tensor_modelencoderlayers0self_attention_blockout_projweight(16384);
+std::vector<float> tensor_modelparticle_embedembed7bias(128);
+std::vector<float> tensor_modelprojection_layerpooling_layerscore_layer0bias(64);
+std::vector<float> tensor_val_59(1);
+std::vector<float> tensor_val_60(1);
+std::vector<float> tensor_modelencoderlayers0feed_forward_blocklinear_2bias(128);
+std::vector<float> tensor_val_68(65536);
+
+//--- reading weights from file
+using SOFIE::ReadTensorFromStream;
+   std::ifstream f;
+   f.open(filename);
+   if (!f.is_open()) {
+      throw std::runtime_error("sofie failed to open file " + filename + " for input weights");
+   }
+   ReadTensorFromStream(f, tensor_modelprojection_layerlinear_classifierweight, "tensor_modelprojection_layerlinear_classifierweight", 32);
+   ReadTensorFromStream(f, tensor_val_43, "tensor_val_43", 1);
+   ReadTensorFromStream(f, tensor_modelprojection_layerlinear1bias, "tensor_modelprojection_layerlinear1bias", 64);
+   ReadTensorFromStream(f, tensor_modelprojection_layerlinear1weight, "tensor_modelprojection_layerlinear1weight", 8192);
+   ReadTensorFromStream(f, tensor_modelparticle_embedembed6weight, "tensor_modelparticle_embedembed6weight", 512);
+   ReadTensorFromStream(f, tensor_modelencodernormalpha, "tensor_modelencodernormalpha", 1);
+   ReadTensorFromStream(f, tensor_val_9, "tensor_val_9", 65536);
+   ReadTensorFromStream(f, tensor_modelencoderlayers0residual_connections1normbias, "tensor_modelencoderlayers0residual_connections1normbias", 1);
+   ReadTensorFromStream(f, tensor_modelparticle_embedembed3weight, "tensor_modelparticle_embedembed3weight", 128);
+   ReadTensorFromStream(f, tensor_modelparticle_embedembed0weight, "tensor_modelparticle_embedembed0weight", 10);
+   ReadTensorFromStream(f, tensor_modelprojection_layerpooling_layerscore_layer2bias, "tensor_modelprojection_layerpooling_layerscore_layer2bias", 1);
+   ReadTensorFromStream(f, tensor_modelparticle_embedembed0bias, "tensor_modelparticle_embedembed0bias", 10);
+   ReadTensorFromStream(f, tensor_modelparticle_embedembed1bias, "tensor_modelparticle_embedembed1bias", 128);
+   ReadTensorFromStream(f, tensor_modelencodernormbias, "tensor_modelencodernormbias", 1);
+   ReadTensorFromStream(f, tensor_modelprojection_layerlinear_chargeweight, "tensor_modelprojection_layerlinear_chargeweight", 32);
+   ReadTensorFromStream(f, tensor_modelprojection_layerlinear2bias, "tensor_modelprojection_layerlinear2bias", 32);
+   ReadTensorFromStream(f, tensor_modelparticle_embedembed3bias, "tensor_modelparticle_embedembed3bias", 128);
+   ReadTensorFromStream(f, tensor_modelparticle_embedembed4bias, "tensor_modelparticle_embedembed4bias", 512);
+   ReadTensorFromStream(f, tensor_modelprojection_layerlinear2weight, "tensor_modelprojection_layerlinear2weight", 2048);
+   ReadTensorFromStream(f, tensor_modelencoderlayers0residual_connections1normalpha, "tensor_modelencoderlayers0residual_connections1normalpha", 1);
+   ReadTensorFromStream(f, tensor_modelencoderlayers0self_attention_blockin_proj_bias, "tensor_modelencoderlayers0self_attention_blockin_proj_bias", 384);
+   ReadTensorFromStream(f, tensor_modelencoderlayers0residual_connections0normalpha, "tensor_modelencoderlayers0residual_connections0normalpha", 1);
+   ReadTensorFromStream(f, tensor_val_75, "tensor_val_75", 8192);
+   ReadTensorFromStream(f, tensor_modelencoderlayers0self_attention_blockout_projbias, "tensor_modelencoderlayers0self_attention_blockout_projbias", 128);
+   ReadTensorFromStream(f, tensor_modelprojection_layerlinear_regressor_ptweight, "tensor_modelprojection_layerlinear_regressor_ptweight", 32);
+   ReadTensorFromStream(f, tensor_val_66, "tensor_val_66", 65536);
+   ReadTensorFromStream(f, tensor_val_56, "tensor_val_56", 1);
+   ReadTensorFromStream(f, tensor_modelparticle_embedembed6bias, "tensor_modelparticle_embedembed6bias", 512);
+   ReadTensorFromStream(f, tensor_modelencoderlayers0feed_forward_blocklinear_1bias, "tensor_modelencoderlayers0feed_forward_blocklinear_1bias", 512);
+   ReadTensorFromStream(f, tensor_modelprojection_layerlinear_classifierbias, "tensor_modelprojection_layerlinear_classifierbias", 1);
+   ReadTensorFromStream(f, tensor_modelencoderlayers0residual_connections0normbias, "tensor_modelencoderlayers0residual_connections0normbias", 1);
+   ReadTensorFromStream(f, tensor_modelprojection_layerlinear_chargebias, "tensor_modelprojection_layerlinear_chargebias", 1);
+   ReadTensorFromStream(f, tensor_val_5, "tensor_val_5", 1280);
+   ReadTensorFromStream(f, tensor_modelprojection_layerlinear_regressor_ptbias, "tensor_modelprojection_layerlinear_regressor_ptbias", 1);
+   ReadTensorFromStream(f, tensor_val_13, "tensor_val_13", 65536);
+   ReadTensorFromStream(f, tensor_val_15, "tensor_val_15", 49152);
+   ReadTensorFromStream(f, tensor_val_77, "tensor_val_77", 64);
+   ReadTensorFromStream(f, tensor_modelencoderlayers0self_attention_blockout_projweight, "tensor_modelencoderlayers0self_attention_blockout_projweight", 16384);
+   ReadTensorFromStream(f, tensor_modelparticle_embedembed7bias, "tensor_modelparticle_embedembed7bias", 128);
+   ReadTensorFromStream(f, tensor_modelprojection_layerpooling_layerscore_layer0bias, "tensor_modelprojection_layerpooling_layerscore_layer0bias", 64);
+   ReadTensorFromStream(f, tensor_val_59, "tensor_val_59", 1);
+   ReadTensorFromStream(f, tensor_val_60, "tensor_val_60", 1);
+   ReadTensorFromStream(f, tensor_modelencoderlayers0feed_forward_blocklinear_2bias, "tensor_modelencoderlayers0feed_forward_blocklinear_2bias", 128);
+   ReadTensorFromStream(f, tensor_val_68, "tensor_val_68", 65536);
+   f.close();
+
+     auto hostBuf_val_32 = alpaka::createView(hostAcc, tensor_val_32, 3);
+     alpaka::memcpy(queue, deviceBuf_val_32, hostBuf_val_32);
+     auto hostBuf_modelprojection_layerlinear_classifierweight = alpaka::createView(hostAcc, tensor_modelprojection_layerlinear_classifierweight, 32);
+     alpaka::memcpy(queue, deviceBuf_modelprojection_layerlinear_classifierweight, hostBuf_modelprojection_layerlinear_classifierweight);
+     auto hostBuf_val_2 = alpaka::createView(hostAcc, tensor_val_2, 1);
+     alpaka::memcpy(queue, deviceBuf_val_2, hostBuf_val_2);
+     auto hostBuf_val_52 = alpaka::createView(hostAcc, tensor_val_52, 3);
+     alpaka::memcpy(queue, deviceBuf_val_52, hostBuf_val_52);
+     auto hostBuf_val_43 = alpaka::createView(hostAcc, tensor_val_43, 1);
+     alpaka::memcpy(queue, deviceBuf_val_43, hostBuf_val_43);
+     auto hostBuf_modelprojection_layerlinear1bias = alpaka::createView(hostAcc, tensor_modelprojection_layerlinear1bias, 64);
+     alpaka::memcpy(queue, deviceBuf_modelprojection_layerlinear1bias, hostBuf_modelprojection_layerlinear1bias);
+     auto hostBuf_modelprojection_layerlinear1weight = alpaka::createView(hostAcc, tensor_modelprojection_layerlinear1weight, 8192);
+     alpaka::memcpy(queue, deviceBuf_modelprojection_layerlinear1weight, hostBuf_modelprojection_layerlinear1weight);
+     auto hostBuf_modelparticle_embedembed6weight = alpaka::createView(hostAcc, tensor_modelparticle_embedembed6weight, 512);
+     alpaka::memcpy(queue, deviceBuf_modelparticle_embedembed6weight, hostBuf_modelparticle_embedembed6weight);
+     auto hostBuf_modelencodernormalpha = alpaka::createView(hostAcc, tensor_modelencodernormalpha, 1);
+     alpaka::memcpy(queue, deviceBuf_modelencodernormalpha, hostBuf_modelencodernormalpha);
+     auto hostBuf_val_9 = alpaka::createView(hostAcc, tensor_val_9, 65536);
+     alpaka::memcpy(queue, deviceBuf_val_9, hostBuf_val_9);
+     auto hostBuf_modelencoderlayers0residual_connections1normbias = alpaka::createView(hostAcc, tensor_modelencoderlayers0residual_connections1normbias, 1);
+     alpaka::memcpy(queue, deviceBuf_modelencoderlayers0residual_connections1normbias, hostBuf_modelencoderlayers0residual_connections1normbias);
+     auto hostBuf_modelparticle_embedembed3weight = alpaka::createView(hostAcc, tensor_modelparticle_embedembed3weight, 128);
+     alpaka::memcpy(queue, deviceBuf_modelparticle_embedembed3weight, hostBuf_modelparticle_embedembed3weight);
+     auto hostBuf_modelparticle_embedembed0weight = alpaka::createView(hostAcc, tensor_modelparticle_embedembed0weight, 10);
+     alpaka::memcpy(queue, deviceBuf_modelparticle_embedembed0weight, hostBuf_modelparticle_embedembed0weight);
+     auto hostBuf_modelprojection_layerpooling_layerscore_layer2bias = alpaka::createView(hostAcc, tensor_modelprojection_layerpooling_layerscore_layer2bias, 1);
+     alpaka::memcpy(queue, deviceBuf_modelprojection_layerpooling_layerscore_layer2bias, hostBuf_modelprojection_layerpooling_layerscore_layer2bias);
+     auto hostBuf_modelparticle_embedembed0bias = alpaka::createView(hostAcc, tensor_modelparticle_embedembed0bias, 10);
+     alpaka::memcpy(queue, deviceBuf_modelparticle_embedembed0bias, hostBuf_modelparticle_embedembed0bias);
+     auto hostBuf_modelparticle_embedembed1bias = alpaka::createView(hostAcc, tensor_modelparticle_embedembed1bias, 128);
+     alpaka::memcpy(queue, deviceBuf_modelparticle_embedembed1bias, hostBuf_modelparticle_embedembed1bias);
+     auto hostBuf_modelencodernormbias = alpaka::createView(hostAcc, tensor_modelencodernormbias, 1);
+     alpaka::memcpy(queue, deviceBuf_modelencodernormbias, hostBuf_modelencodernormbias);
+     auto hostBuf_modelprojection_layerlinear_chargeweight = alpaka::createView(hostAcc, tensor_modelprojection_layerlinear_chargeweight, 32);
+     alpaka::memcpy(queue, deviceBuf_modelprojection_layerlinear_chargeweight, hostBuf_modelprojection_layerlinear_chargeweight);
+     auto hostBuf_modelprojection_layerlinear2bias = alpaka::createView(hostAcc, tensor_modelprojection_layerlinear2bias, 32);
+     alpaka::memcpy(queue, deviceBuf_modelprojection_layerlinear2bias, hostBuf_modelprojection_layerlinear2bias);
+     auto hostBuf_modelparticle_embedembed3bias = alpaka::createView(hostAcc, tensor_modelparticle_embedembed3bias, 128);
+     alpaka::memcpy(queue, deviceBuf_modelparticle_embedembed3bias, hostBuf_modelparticle_embedembed3bias);
+     auto hostBuf_modelparticle_embedembed4bias = alpaka::createView(hostAcc, tensor_modelparticle_embedembed4bias, 512);
+     alpaka::memcpy(queue, deviceBuf_modelparticle_embedembed4bias, hostBuf_modelparticle_embedembed4bias);
+     auto hostBuf_modelprojection_layerlinear2weight = alpaka::createView(hostAcc, tensor_modelprojection_layerlinear2weight, 2048);
+     alpaka::memcpy(queue, deviceBuf_modelprojection_layerlinear2weight, hostBuf_modelprojection_layerlinear2weight);
+     auto hostBuf_modelencoderlayers0residual_connections1normalpha = alpaka::createView(hostAcc, tensor_modelencoderlayers0residual_connections1normalpha, 1);
+     alpaka::memcpy(queue, deviceBuf_modelencoderlayers0residual_connections1normalpha, hostBuf_modelencoderlayers0residual_connections1normalpha);
+     auto hostBuf_modelencoderlayers0self_attention_blockin_proj_bias = alpaka::createView(hostAcc, tensor_modelencoderlayers0self_attention_blockin_proj_bias, 384);
+     alpaka::memcpy(queue, deviceBuf_modelencoderlayers0self_attention_blockin_proj_bias, hostBuf_modelencoderlayers0self_attention_blockin_proj_bias);
+     auto hostBuf_modelencoderlayers0residual_connections0normalpha = alpaka::createView(hostAcc, tensor_modelencoderlayers0residual_connections0normalpha, 1);
+     alpaka::memcpy(queue, deviceBuf_modelencoderlayers0residual_connections0normalpha, hostBuf_modelencoderlayers0residual_connections0normalpha);
+     auto hostBuf_val_75 = alpaka::createView(hostAcc, tensor_val_75, 8192);
+     alpaka::memcpy(queue, deviceBuf_val_75, hostBuf_val_75);
+     auto hostBuf_modelencoderlayers0self_attention_blockout_projbias = alpaka::createView(hostAcc, tensor_modelencoderlayers0self_attention_blockout_projbias, 128);
+     alpaka::memcpy(queue, deviceBuf_modelencoderlayers0self_attention_blockout_projbias, hostBuf_modelencoderlayers0self_attention_blockout_projbias);
+     auto hostBuf_modelprojection_layerlinear_regressor_ptweight = alpaka::createView(hostAcc, tensor_modelprojection_layerlinear_regressor_ptweight, 32);
+     alpaka::memcpy(queue, deviceBuf_modelprojection_layerlinear_regressor_ptweight, hostBuf_modelprojection_layerlinear_regressor_ptweight);
+     auto hostBuf_val_66 = alpaka::createView(hostAcc, tensor_val_66, 65536);
+     alpaka::memcpy(queue, deviceBuf_val_66, hostBuf_val_66);
+     auto hostBuf_val_81 = alpaka::createView(hostAcc, tensor_val_81, 2);
+     alpaka::memcpy(queue, deviceBuf_val_81, hostBuf_val_81);
+     auto hostBuf_val_56 = alpaka::createView(hostAcc, tensor_val_56, 1);
+     alpaka::memcpy(queue, deviceBuf_val_56, hostBuf_val_56);
+     auto hostBuf_modelparticle_embedembed6bias = alpaka::createView(hostAcc, tensor_modelparticle_embedembed6bias, 512);
+     alpaka::memcpy(queue, deviceBuf_modelparticle_embedembed6bias, hostBuf_modelparticle_embedembed6bias);
+     auto hostBuf_modelencoderlayers0feed_forward_blocklinear_1bias = alpaka::createView(hostAcc, tensor_modelencoderlayers0feed_forward_blocklinear_1bias, 512);
+     alpaka::memcpy(queue, deviceBuf_modelencoderlayers0feed_forward_blocklinear_1bias, hostBuf_modelencoderlayers0feed_forward_blocklinear_1bias);
+     auto hostBuf_modelprojection_layerlinear_classifierbias = alpaka::createView(hostAcc, tensor_modelprojection_layerlinear_classifierbias, 1);
+     alpaka::memcpy(queue, deviceBuf_modelprojection_layerlinear_classifierbias, hostBuf_modelprojection_layerlinear_classifierbias);
+     auto hostBuf_val_25 = alpaka::createView(hostAcc, tensor_val_25, 1);
+     alpaka::memcpy(queue, deviceBuf_val_25, hostBuf_val_25);
+     auto hostBuf_modelencoderlayers0residual_connections0normbias = alpaka::createView(hostAcc, tensor_modelencoderlayers0residual_connections0normbias, 1);
+     alpaka::memcpy(queue, deviceBuf_modelencoderlayers0residual_connections0normbias, hostBuf_modelencoderlayers0residual_connections0normbias);
+     auto hostBuf_modelprojection_layerlinear_chargebias = alpaka::createView(hostAcc, tensor_modelprojection_layerlinear_chargebias, 1);
+     alpaka::memcpy(queue, deviceBuf_modelprojection_layerlinear_chargebias, hostBuf_modelprojection_layerlinear_chargebias);
+     auto hostBuf_val_5 = alpaka::createView(hostAcc, tensor_val_5, 1280);
+     alpaka::memcpy(queue, deviceBuf_val_5, hostBuf_val_5);
+     auto hostBuf_modelprojection_layerlinear_regressor_ptbias = alpaka::createView(hostAcc, tensor_modelprojection_layerlinear_regressor_ptbias, 1);
+     alpaka::memcpy(queue, deviceBuf_modelprojection_layerlinear_regressor_ptbias, hostBuf_modelprojection_layerlinear_regressor_ptbias);
+     auto hostBuf_val_13 = alpaka::createView(hostAcc, tensor_val_13, 65536);
+     alpaka::memcpy(queue, deviceBuf_val_13, hostBuf_val_13);
+     auto hostBuf_val_15 = alpaka::createView(hostAcc, tensor_val_15, 49152);
+     alpaka::memcpy(queue, deviceBuf_val_15, hostBuf_val_15);
+     auto hostBuf_val_55 = alpaka::createView(hostAcc, tensor_val_55, 1);
+     alpaka::memcpy(queue, deviceBuf_val_55, hostBuf_val_55);
+     auto hostBuf_val_77 = alpaka::createView(hostAcc, tensor_val_77, 64);
+     alpaka::memcpy(queue, deviceBuf_val_77, hostBuf_val_77);
+     auto hostBuf_mul_55 = alpaka::createView(hostAcc, tensor_mul_55, 1);
+     alpaka::memcpy(queue, deviceBuf_mul_55, hostBuf_mul_55);
+     auto hostBuf_val_80 = alpaka::createView(hostAcc, tensor_val_80, 4);
+     alpaka::memcpy(queue, deviceBuf_val_80, hostBuf_val_80);
+     auto hostBuf_modelencoderlayers0self_attention_blockout_projweight = alpaka::createView(hostAcc, tensor_modelencoderlayers0self_attention_blockout_projweight, 16384);
+     alpaka::memcpy(queue, deviceBuf_modelencoderlayers0self_attention_blockout_projweight, hostBuf_modelencoderlayers0self_attention_blockout_projweight);
+     auto hostBuf_modelparticle_embedembed7bias = alpaka::createView(hostAcc, tensor_modelparticle_embedembed7bias, 128);
+     alpaka::memcpy(queue, deviceBuf_modelparticle_embedembed7bias, hostBuf_modelparticle_embedembed7bias);
+     auto hostBuf_val_23 = alpaka::createView(hostAcc, tensor_val_23, 1);
+     alpaka::memcpy(queue, deviceBuf_val_23, hostBuf_val_23);
+     auto hostBuf_val_24 = alpaka::createView(hostAcc, tensor_val_24, 1);
+     alpaka::memcpy(queue, deviceBuf_val_24, hostBuf_val_24);
+     auto hostBuf_val_26 = alpaka::createView(hostAcc, tensor_val_26, 1);
+     alpaka::memcpy(queue, deviceBuf_val_26, hostBuf_val_26);
+     auto hostBuf_modelprojection_layerpooling_layerscore_layer0bias = alpaka::createView(hostAcc, tensor_modelprojection_layerpooling_layerscore_layer0bias, 64);
+     alpaka::memcpy(queue, deviceBuf_modelprojection_layerpooling_layerscore_layer0bias, hostBuf_modelprojection_layerpooling_layerscore_layer0bias);
+     auto hostBuf_val_59 = alpaka::createView(hostAcc, tensor_val_59, 1);
+     alpaka::memcpy(queue, deviceBuf_val_59, hostBuf_val_59);
+     auto hostBuf_val_60 = alpaka::createView(hostAcc, tensor_val_60, 1);
+     alpaka::memcpy(queue, deviceBuf_val_60, hostBuf_val_60);
+     auto hostBuf_modelencoderlayers0feed_forward_blocklinear_2bias = alpaka::createView(hostAcc, tensor_modelencoderlayers0feed_forward_blocklinear_2bias, 128);
+     alpaka::memcpy(queue, deviceBuf_modelencoderlayers0feed_forward_blocklinear_2bias, hostBuf_modelencoderlayers0feed_forward_blocklinear_2bias);
+     auto hostBuf_val_68 = alpaka::createView(hostAcc, tensor_val_68, 65536);
+     alpaka::memcpy(queue, deviceBuf_val_68, hostBuf_val_68);
+     auto hostBuf_val_79 = alpaka::createView(hostAcc, tensor_val_79, 1);
+     alpaka::memcpy(queue, deviceBuf_val_79, hostBuf_val_79);
+//---- allocate unified intermediate tensor pool
+
+   // --- Unified tensor pool: lifetime-aware packing ---
+   {
+      // +8192 bytes appended after the packed region: extra slot for the three
+      // simultaneously-live final outputs (see charge_logit assignment below)
+      constexpr std::size_t kConstPoolBytes = 169082880 + 8192;
+      std::size_t poolTotalBytes = kConstPoolBytes;
+
+      // Allocate unified pool buffer
+      if (poolTotalBytes > 0)
+         fUnifiedPool = alpaka::allocBuf<uint8_t, Idx>(devAcc, Ext1D::all(Idx{poolTotalBytes}));
+      auto* poolBase = (poolTotalBytes > 0) ? alpaka::getPtrNative(fUnifiedPool) : nullptr;
+      fUnifiedPoolSize = poolTotalBytes;
+
+      // Assign tensor views into unified pool
+      deviceBuf_reg_pt = ViewF1D{reinterpret_cast<float*>(poolBase + 0), devAcc, Ext1D::all(Idx{2048})};
+      deviceBuf_class_logit = ViewF1D{reinterpret_cast<float*>(poolBase + 24576), devAcc, Ext1D::all(Idx{2048})};
+      deviceBuf_linear_12 = ViewF1D{reinterpret_cast<float*>(poolBase + 8192), devAcc, Ext1D::all(Idx{2048})};
+      deviceBuf_sum_1 = ViewF1D{reinterpret_cast<float*>(poolBase + 17039360), devAcc, Ext1D::all(Idx{262144})};
+      deviceBuf_linear_8 = ViewF1D{reinterpret_cast<float*>(poolBase + 16777216), devAcc, Ext1D::all(Idx{32768})};
+      deviceBuf_linear_7 = ViewF1D{reinterpret_cast<float*>(poolBase + 16777216), devAcc, Ext1D::all(Idx{2097152})};
+      deviceBuf_softmax_1 = ViewF1D{reinterpret_cast<float*>(poolBase + 16908288), devAcc, Ext1D::all(Idx{32768})};
+      deviceBuf_sub_100 = ViewF1D{reinterpret_cast<float*>(poolBase + 16777216), devAcc, Ext1D::all(Idx{4194304})};
+      deviceBuf_transpose_4 = ViewF1D{reinterpret_cast<float*>(poolBase + 16777216), devAcc, Ext1D::all(Idx{4194304})};
+      deviceBuf_relu_4 = ViewF1D{reinterpret_cast<float*>(poolBase + 0), devAcc, Ext1D::all(Idx{131072})};
+      deviceBuf_select = ViewF1D{reinterpret_cast<float*>(poolBase + 134217728), devAcc, Ext1D::all(Idx{4194304})};
+      deviceBuf_relu_5 = ViewF1D{reinterpret_cast<float*>(poolBase + 524288), devAcc, Ext1D::all(Idx{65536})};
+      deviceBuf_select_2 = ViewF1D{reinterpret_cast<float*>(poolBase + 0), devAcc, Ext1D::all(Idx{4194304})};
+      deviceBuf_transpose_5 = ViewF1D{reinterpret_cast<float*>(poolBase + 33554432), devAcc, Ext1D::all(Idx{4194304})};
+      deviceBuf_select_1 = ViewF1D{reinterpret_cast<float*>(poolBase + 150994944), devAcc, Ext1D::all(Idx{4194304})};
+      deviceBuf_relu = ViewF1D{reinterpret_cast<float*>(poolBase + 1310720), devAcc, Ext1D::all(Idx{4194304})};
+      deviceBuf_linear_13 = ViewF1D{reinterpret_cast<float*>(poolBase + 16384), devAcc, Ext1D::all(Idx{2048})};
+      deviceBuf_transpose_1 = ViewF1D{reinterpret_cast<float*>(poolBase + 83886080), devAcc, Ext1D::all(Idx{12582912})};
+      deviceBuf_transpose_6 = ViewF1D{reinterpret_cast<float*>(poolBase + 0), devAcc, Ext1D::all(Idx{4194304})};
+      deviceBuf_layer_norm = ViewF1D{reinterpret_cast<float*>(poolBase + 0), devAcc, Ext1D::all(Idx{327680})};
+      deviceBuf_softmax = ViewF1D{reinterpret_cast<float*>(poolBase + 0), devAcc, Ext1D::all(Idx{4194304})};
+      deviceBuf_mul_74 = ViewF1D{reinterpret_cast<float*>(poolBase + 0), devAcc, Ext1D::all(Idx{4194304})};
+      // FIX (generator defect): final outputs must not share arena slots;
+      // reg_pt takes poolBase+0, so charge_logit gets the appended tail slot
+      // instead of aliasing it (was: poolBase + 0)
+      deviceBuf_charge_logit = ViewF1D{reinterpret_cast<float*>(poolBase + 169082880), devAcc, Ext1D::all(Idx{2048})};
+      deviceBuf_transpose = ViewF1D{reinterpret_cast<float*>(poolBase + 16777216), devAcc, Ext1D::all(Idx{4194304})};
+      deviceBuf_bmm = ViewF1D{reinterpret_cast<float*>(poolBase + 50331648), devAcc, Ext1D::all(Idx{4194304})};
+      deviceBuf_relu_3 = ViewF1D{reinterpret_cast<float*>(poolBase + 50462720), devAcc, Ext1D::all(Idx{16777216})};
+      deviceBuf_relu_2 = ViewF1D{reinterpret_cast<float*>(poolBase + 0), devAcc, Ext1D::all(Idx{4194304})};
+      deviceBuf_linear_11 = ViewF1D{reinterpret_cast<float*>(poolBase + 0), devAcc, Ext1D::all(Idx{2048})};
+      deviceBuf_linear_6 = ViewF1D{reinterpret_cast<float*>(poolBase + 0), devAcc, Ext1D::all(Idx{4194304})};
+      deviceBuf_add_278 = ViewF1D{reinterpret_cast<float*>(poolBase + 0), devAcc, Ext1D::all(Idx{4194304})};
+      deviceBuf_layer_norm_1 = ViewF1D{reinterpret_cast<float*>(poolBase + 18087936), devAcc, Ext1D::all(Idx{4194304})};
+      deviceBuf_tanh = ViewF1D{reinterpret_cast<float*>(poolBase + 25165824), devAcc, Ext1D::all(Idx{2097152})};
+      deviceBuf_relu_1 = ViewF1D{reinterpret_cast<float*>(poolBase + 34865152), devAcc, Ext1D::all(Idx{16777216})};
+      deviceBuf_div = ViewF1D{reinterpret_cast<float*>(poolBase + 16908288), devAcc, Ext1D::all(Idx{4194304})};
+      deviceBuf_layer_norm_2 = ViewF1D{reinterpret_cast<float*>(poolBase + 101974016), devAcc, Ext1D::all(Idx{16777216})};
+      deviceBuf_linear_4 = ViewF1D{reinterpret_cast<float*>(poolBase + 16777216), devAcc, Ext1D::all(Idx{4194304})};
+      deviceBuf_mean = ViewF1D{reinterpret_cast<float*>(poolBase + 16777216), devAcc, Ext1D::all(Idx{32768})};
+      deviceBuf_transpose_7 = ViewF1D{reinterpret_cast<float*>(poolBase + 0), devAcc, Ext1D::all(Idx{4194304})};
+      deviceBuf_linear_3 = ViewF1D{reinterpret_cast<float*>(poolBase + 33554432), devAcc, Ext1D::all(Idx{12582912})};
+      deviceBuf_bmm_1 = ViewF1D{reinterpret_cast<float*>(poolBase + 33554432), devAcc, Ext1D::all(Idx{4194304})};
+      deviceBuf_add_189 = ViewF1D{reinterpret_cast<float*>(poolBase + 33685504), devAcc, Ext1D::all(Idx{4194304})};
+      deviceBuf_sub_81 = ViewF1D{reinterpret_cast<float*>(poolBase + 50462720), devAcc, Ext1D::all(Idx{4194304})};
+      deviceBuf_add_224 = ViewF1D{reinterpret_cast<float*>(poolBase + 0), devAcc, Ext1D::all(Idx{4194304})};
+   }
+
+blas.addOperationConfig(128, 32768, 10, 128, 10, 128, 'n', 'n', Epilogue::ReluBias);
+
+blas.addOperationConfig(512, 32768, 128, 512, 128, 512, 'n', 'n', Epilogue::ReluBias);
+
+blas.addOperationConfig(128, 32768, 512, 128, 512, 128, 'n', 'n', Epilogue::ReluBias);
+
+blas.addOperationConfig(384, 32768, 128, 384, 128, 384, 'n', 'n', Epilogue::Bias);
+
+blas.addOperationConfig(128, 32768, 128, 128, 128, 128, 't', 'n', Epilogue::Bias);
+
+blas.addOperationConfig(512, 32768, 128, 512, 128, 512, 'n', 'n', Epilogue::ReluBias);
+
+blas.addOperationConfig(128, 32768, 512, 128, 512, 128, 'n', 'n', Epilogue::Bias);
+
+blas.addOperationConfig(64, 32768, 128, 64, 128, 64, 'n', 'n', Epilogue::Bias);
+
+blas.addOperationConfig(1, 32768, 64, 1, 64, 1, 'n', 'n', Epilogue::Bias);
+
+blas.addOperationConfig(64, 2048, 128, 128, 128, 64, 't', 'n', Epilogue::ReluBias);
+
+blas.addOperationConfig(32, 2048, 64, 64, 64, 32, 't', 'n', Epilogue::ReluBias);
+
+blas.addOperationConfig(1, 2048, 32, 32, 32, 1, 't', 'n', Epilogue::Bias);
+
+blas.addOperationConfig(1, 2048, 32, 32, 32, 1, 't', 'n', Epilogue::Bias);
+
+blas.addOperationConfig(1, 2048, 32, 32, 32, 1, 't', 'n', Epilogue::Bias);
+
+alpaka::wait(queue);
+}
+
+public:
+
+
+Session(std::string filename = "STT_ort_relu_fp32_b2048_s16.dat") {
+   InitSession(filename);
+}
+
+Session(QueueAcc& extQueue, std::string filename = "STT_ort_relu_fp32_b2048_s16.dat")
+    : queue(extQueue), blas(queue)
+{
+   InitSession(filename);
+}
+
+   LayerNormKernel_op_3 layerNormKernel_op_3;
+GemmBiasAddKernel gemmBiasAddKernel;
+   ReluKernel reluKernel;
+   LayerNormKernel_op_6 layerNormKernel_op_6;
+   LayerNormKernel_op_9 layerNormKernel_op_9;
+   TransposeKernel_op_12 transposeKernel_12;
+   FusedEltwiseKernel_14_15_16 fusedEltwiseKernel_14_15_16;
+   GatherKernel_op_18 gatherKernel_op_18;
+   GatherKernel_op_19 gatherKernel_op_19;
+   GatherKernel_op_20 gatherKernel_op_20;
+   FusedEltwiseKernel_24_25_29 fusedEltwiseKernel_24_25_29;
+   FusedEltwiseKernel_26_30 fusedEltwiseKernel_26_30;
+   FusedEltwiseKernel_27_28 fusedEltwiseKernel_27_28;
+   SoftmaxKernel_op_32 softmaxKernel_op_32;
+   TransposeKernel_op_34 transposeKernel_34;
+   FusedEltwiseKernel_38_39 fusedEltwiseKernel_38_39;
+   ReduceKernel_ReduceMean_mean reduceKernel_ReduceMean_mean;
+   FusedEltwiseKernel_41_42_43_44_45_46_47_48 fusedEltwiseKernel_41_42_43_44_45_46_47_48;
+   FusedEltwiseKernel_49_50_51_52 fusedEltwiseKernel_49_50_51_52;
+   FusedEltwiseKernel_53_54_55_56_57_58_59_60 fusedEltwiseKernel_53_54_55_56_57_58_59_60;
+   FusedEltwiseKernel_64_65_66 fusedEltwiseKernel_64_65_66;
+   FusedEltwiseKernel_67_68_69_70_71_72_73_74 fusedEltwiseKernel_67_68_69_70_71_72_73_74;
+   TanhKernel tanhKernel;
+   SoftmaxKernel_op_78 softmaxKernel_op_78;
+   FusedEltwiseKernel_79_80 fusedEltwiseKernel_79_80;
+   FusedEltwiseKernel_84_89 fusedEltwiseKernel_84_89;
+   FusedEltwiseKernel_86_91 fusedEltwiseKernel_86_91;
+   FusedEltwiseKernel_88_90 fusedEltwiseKernel_88_90;
+
+
+void _infer_impl(ViewConstF1D const& deviceBuf_particles,ViewConstF1D const& deviceBuf_padding_masks){
+
+//------ LAYERNORM_GPU_ALPAKA
+   alpaka::WorkDivMembers<Dim, Idx> workDiv_op_3(
+      Vec::all(Idx{32768}),
+      Vec::all(Idx{16u}),
+      Vec::all(Idx{1u}));
+   alpaka::exec<Acc>(queue, workDiv_op_3, layerNormKernel_op_3, alpaka::getPtrNative(deviceBuf_particles), alpaka::getPtrNative(deviceBuf_modelparticle_embedembed0weight), alpaka::getPtrNative(deviceBuf_modelparticle_embedembed0bias), alpaka::getPtrNative(deviceBuf_layer_norm), static_cast<Idx>(32768));
+
+//--------- Gemm_GPU_ALPAKA
+   char op_4_transA = 'n';
+   char op_4_transB = 'n';
+   int op_4_m = 16;
+   int op_4_n = 128;
+   int op_4_k = 10;
+   float op_4_alpha = 1;
+   float op_4_beta = 0;
+   blas.gemmrelu(op_4_transB, op_4_transA, op_4_n, 32768, op_4_k, op_4_alpha, static_cast<const float*>(alpaka::getPtrNative(deviceBuf_val_5)), static_cast<const float*>(alpaka::getPtrNative(deviceBuf_layer_norm)), op_4_beta, alpaka::getPtrNative(deviceBuf_modelparticle_embedembed1bias), alpaka::getPtrNative(deviceBuf_relu));
+
+//------ LAYERNORM_GPU_ALPAKA
+   alpaka::WorkDivMembers<Dim, Idx> workDiv_op_6(
+      Vec::all(Idx{32768}),
+      Vec::all(Idx{128u}),
+      Vec::all(Idx{1u}));
+   alpaka::exec<Acc>(queue, workDiv_op_6, layerNormKernel_op_6, alpaka::getPtrNative(deviceBuf_relu), alpaka::getPtrNative(deviceBuf_modelparticle_embedembed3weight), alpaka::getPtrNative(deviceBuf_modelparticle_embedembed3bias), alpaka::getPtrNative(deviceBuf_layer_norm_1), static_cast<Idx>(32768));
+
+//--------- Gemm_GPU_ALPAKA
+   char op_7_transA = 'n';
+   char op_7_transB = 'n';
+   int op_7_m = 16;
+   int op_7_n = 512;
+   int op_7_k = 128;
+   float op_7_alpha = 1;
+   float op_7_beta = 0;
+   blas.gemmrelu(op_7_transB, op_7_transA, op_7_n, 32768, op_7_k, op_7_alpha, static_cast<const float*>(alpaka::getPtrNative(deviceBuf_val_9)), static_cast<const float*>(alpaka::getPtrNative(deviceBuf_layer_norm_1)), op_7_beta, alpaka::getPtrNative(deviceBuf_modelparticle_embedembed4bias), alpaka::getPtrNative(deviceBuf_relu_1));
+
+//------ LAYERNORM_GPU_ALPAKA
+   alpaka::WorkDivMembers<Dim, Idx> workDiv_op_9(
+      Vec::all(Idx{32768}),
+      Vec::all(Idx{256u}),
+      Vec::all(Idx{1u}));
+   alpaka::exec<Acc>(queue, workDiv_op_9, layerNormKernel_op_9, alpaka::getPtrNative(deviceBuf_relu_1), alpaka::getPtrNative(deviceBuf_modelparticle_embedembed6weight), alpaka::getPtrNative(deviceBuf_modelparticle_embedembed6bias), alpaka::getPtrNative(deviceBuf_layer_norm_2), static_cast<Idx>(32768));
+
+//--------- Gemm_GPU_ALPAKA
+   char op_10_transA = 'n';
+   char op_10_transB = 'n';
+   int op_10_m = 16;
+   int op_10_n = 128;
+   int op_10_k = 512;
+   float op_10_alpha = 1;
+   float op_10_beta = 0;
+   blas.gemmrelu(op_10_transB, op_10_transA, op_10_n, 32768, op_10_k, op_10_alpha, static_cast<const float*>(alpaka::getPtrNative(deviceBuf_val_13)), static_cast<const float*>(alpaka::getPtrNative(deviceBuf_layer_norm_2)), op_10_beta, alpaka::getPtrNative(deviceBuf_modelparticle_embedembed7bias), alpaka::getPtrNative(deviceBuf_relu_2));
+
+//------ TRANSPOSE_GPU_ALPAKA
+   auto const elementsPerThread_transpose = Vec::all(static_cast<Idx>(1));
+   auto const elementsPerGrid_transpose = Vec::all(Idx{4194304});
+   auto const workDiv_transpose = sofie_workdiv(elementsPerGrid_transpose);
+   auto task_12 = alpaka::createTaskKernel<Acc>(workDiv_transpose, transposeKernel_12, alpaka::getPtrNative(deviceBuf_relu_2), alpaka::getPtrNative(deviceBuf_transpose), static_cast<Idx>(4194304));
+   alpaka::enqueue(queue, task_12);
+
+//--------- Gemm_GPU_ALPAKA
+   char op_13_transA = 'n';
+   char op_13_transB = 'n';
+   int op_13_m = 2048;
+   int op_13_n = 384;
+   int op_13_k = 128;
+   float op_13_alpha = 1;
+   float op_13_beta = 0;
+   blas.gemm(op_13_transB, op_13_transA, op_13_n, 32768, op_13_k, op_13_alpha, static_cast<const float*>(alpaka::getPtrNative(deviceBuf_val_15)), static_cast<const float*>(alpaka::getPtrNative(deviceBuf_transpose)), op_13_beta, alpaka::getPtrNative(deviceBuf_modelencoderlayers0self_attention_blockin_proj_bias), alpaka::getPtrNative(deviceBuf_linear_3));
+
+//------ FUSED_ELTWISE_GPU_ALPAKA_14_15_16
+   {
+      auto const elementsPerThread_fused_14_15_16 = Vec::all(static_cast<Idx>(1));
+      auto const elementsPerGrid_fused_14_15_16 = Vec::all(Idx{12582912});
+      auto const workDiv_fused_14_15_16 = sofie_workdiv(elementsPerGrid_fused_14_15_16);
+      auto task_fused_14_15_16 = alpaka::createTaskKernel<Acc>(workDiv_fused_14_15_16, fusedEltwiseKernel_14_15_16, alpaka::getPtrNative(deviceBuf_linear_3), alpaka::getPtrNative(deviceBuf_transpose_1), static_cast<Idx>(12582912));
+      alpaka::enqueue(queue, task_fused_14_15_16);
+   }
+   ///------- Squeeze operator op_17
+   auto deviceBuf_squeeze = alpaka::createView(devAcc, alpaka::getPtrNative(deviceBuf_transpose_1), static_cast<Idx>(12582912));
+
+//------ GATHER_GPU_ALPAKA
+   auto const elementsPerThread_op_18 = Vec::all(static_cast<Idx>(1));
+   auto const elementsPerGrid_op_18 = Vec::all(Idx{4194304});
+   auto const workDiv_op_18 = sofie_workdiv(elementsPerGrid_op_18);
+   auto task_op_18 = alpaka::createTaskKernel<Acc>(workDiv_op_18, gatherKernel_op_18, alpaka::getPtrNative(deviceBuf_squeeze), alpaka::getPtrNative(deviceBuf_val_25), alpaka::getPtrNative(deviceBuf_select), static_cast<Idx>(4194304));
+   alpaka::enqueue(queue, task_op_18);
+
+//------ GATHER_GPU_ALPAKA
+   auto const elementsPerThread_op_19 = Vec::all(static_cast<Idx>(1));
+   auto const elementsPerGrid_op_19 = Vec::all(Idx{4194304});
+   auto const workDiv_op_19 = sofie_workdiv(elementsPerGrid_op_19);
+   auto task_op_19 = alpaka::createTaskKernel<Acc>(workDiv_op_19, gatherKernel_op_19, alpaka::getPtrNative(deviceBuf_squeeze), alpaka::getPtrNative(deviceBuf_val_2), alpaka::getPtrNative(deviceBuf_select_1), static_cast<Idx>(4194304));
+   alpaka::enqueue(queue, task_op_19);
+
+//------ GATHER_GPU_ALPAKA
+   auto const elementsPerThread_op_20 = Vec::all(static_cast<Idx>(1));
+   auto const elementsPerGrid_op_20 = Vec::all(Idx{4194304});
+   auto const workDiv_op_20 = sofie_workdiv(elementsPerGrid_op_20);
+   auto task_op_20 = alpaka::createTaskKernel<Acc>(workDiv_op_20, gatherKernel_op_20, alpaka::getPtrNative(deviceBuf_squeeze), alpaka::getPtrNative(deviceBuf_val_26), alpaka::getPtrNative(deviceBuf_select_2), static_cast<Idx>(4194304));
+   alpaka::enqueue(queue, task_op_20);
+
+//------ FUSED_ELTWISE_GPU_ALPAKA_27_28
+   {
+      auto const elementsPerThread_fused_27_28 = Vec::all(static_cast<Idx>(1));
+      auto const elementsPerGrid_fused_27_28 = Vec::all(Idx{4194304});
+      auto const workDiv_fused_27_28 = sofie_workdiv(elementsPerGrid_fused_27_28);
+      auto task_fused_27_28 = alpaka::createTaskKernel<Acc>(workDiv_fused_27_28, fusedEltwiseKernel_27_28, alpaka::getPtrNative(deviceBuf_select_2), alpaka::getPtrNative(deviceBuf_transpose_4), static_cast<Idx>(4194304));
+      alpaka::enqueue(queue, task_fused_27_28);
+   }
+
+//------ FUSED_ELTWISE_GPU_ALPAKA_24_25_29
+   {
+      auto const elementsPerThread_fused_24_25_29 = Vec::all(static_cast<Idx>(1));
+      auto const elementsPerGrid_fused_24_25_29 = Vec::all(Idx{4194304});
+      auto const workDiv_fused_24_25_29 = sofie_workdiv(elementsPerGrid_fused_24_25_29);
+      auto task_fused_24_25_29 = alpaka::createTaskKernel<Acc>(workDiv_fused_24_25_29, fusedEltwiseKernel_24_25_29, alpaka::getPtrNative(deviceBuf_select), alpaka::getPtrNative(deviceBuf_val_43), alpaka::getPtrNative(deviceBuf_mul_74), static_cast<Idx>(4194304));
+      alpaka::enqueue(queue, task_fused_24_25_29);
+   }
+
+//------ FUSED_ELTWISE_GPU_ALPAKA_26_30
+   {
+      auto const elementsPerThread_fused_26_30 = Vec::all(static_cast<Idx>(1));
+      auto const elementsPerGrid_fused_26_30 = Vec::all(Idx{4194304});
+      auto const workDiv_fused_26_30 = sofie_workdiv(elementsPerGrid_fused_26_30);
+      auto task_fused_26_30 = alpaka::createTaskKernel<Acc>(workDiv_fused_26_30, fusedEltwiseKernel_26_30, alpaka::getPtrNative(deviceBuf_select_1), alpaka::getPtrNative(deviceBuf_transpose_5), static_cast<Idx>(4194304));
+      alpaka::enqueue(queue, task_fused_26_30);
+   }
+
+//--------- Gemm_GPU_ALPAKA
+   char op_31_transA = 'n';
+   char op_31_transB = 'n';
+   int op_31_m = 16;
+   int op_31_n = 16;
+   int op_31_k = 16;
+   float op_31_alpha = 1;
+   float op_31_beta = 0;
+   blas.gemmStridedBatched(op_31_transB, op_31_transA, 16, 16, 16, op_31_alpha, alpaka::getPtrNative(deviceBuf_transpose_5), 16, 256, alpaka::getPtrNative(deviceBuf_mul_74), 16, 256, op_31_beta, alpaka::getPtrNative(deviceBuf_bmm), 16, 256, 16384);
+
+//------ SOFTMAX_GPU_ALPAKA
+   alpaka::WorkDivMembers<Dim, Idx> workDiv_op_32(
+      Vec::all(static_cast<Idx>(262144)),
+      Vec::all(Idx{32u}),
+      Vec::all(Idx{1u}));
+   auto task_op_32 = alpaka::createTaskKernel<Acc>(workDiv_op_32, softmaxKernel_op_32, alpaka::getPtrNative(deviceBuf_bmm), alpaka::getPtrNative(deviceBuf_softmax), static_cast<Idx>(262144));
+   alpaka::enqueue(queue, task_op_32);
+
+//--------- Gemm_GPU_ALPAKA
+   char op_33_transA = 'n';
+   char op_33_transB = 'n';
+   int op_33_m = 16;
+   int op_33_n = 16;
+   int op_33_k = 16;
+   float op_33_alpha = 1;
+   float op_33_beta = 0;
+   blas.gemmStridedBatched(op_33_transB, op_33_transA, 16, 16, 16, op_33_alpha, alpaka::getPtrNative(deviceBuf_transpose_4), 16, 256, alpaka::getPtrNative(deviceBuf_softmax), 16, 256, op_33_beta, alpaka::getPtrNative(deviceBuf_bmm_1), 16, 256, 16384);
+
+//------ TRANSPOSE_GPU_ALPAKA
+   auto const elementsPerThread_transpose_6 = Vec::all(static_cast<Idx>(1));
+   auto const elementsPerGrid_transpose_6 = Vec::all(Idx{4194304});
+   auto const workDiv_transpose_6 = sofie_workdiv(elementsPerGrid_transpose_6);
+   auto task_34 = alpaka::createTaskKernel<Acc>(workDiv_transpose_6, transposeKernel_34, alpaka::getPtrNative(deviceBuf_bmm_1), alpaka::getPtrNative(deviceBuf_transpose_6), static_cast<Idx>(4194304));
+   alpaka::enqueue(queue, task_34);
+   ///------- Reshape operator op_35
+   auto deviceBuf_view_4 = alpaka::createView(devAcc, alpaka::getPtrNative(deviceBuf_transpose_6), static_cast<Idx>(4194304));
+
+//--------- Gemm_GPU_ALPAKA
+   char op_36_transA = 'n';
+   char op_36_transB = 't';
+   int op_36_m = 32768;
+   int op_36_n = 128;
+   int op_36_k = 128;
+   float op_36_alpha = 1;
+   float op_36_beta = 0;
+   blas.gemm(op_36_transB, op_36_transA, op_36_n, op_36_m, op_36_k, op_36_alpha, static_cast<const float*>(alpaka::getPtrNative(deviceBuf_modelencoderlayers0self_attention_blockout_projweight)), static_cast<const float*>(alpaka::getPtrNative(deviceBuf_view_4)), op_36_beta, alpaka::getPtrNative(deviceBuf_modelencoderlayers0self_attention_blockout_projbias), alpaka::getPtrNative(deviceBuf_linear_4));
+
+//------ FUSED_ELTWISE_GPU_ALPAKA_38_39
+   {
+      auto const elementsPerThread_fused_38_39 = Vec::all(static_cast<Idx>(1));
+      auto const elementsPerGrid_fused_38_39 = Vec::all(Idx{4194304});
+      auto const workDiv_fused_38_39 = sofie_workdiv(elementsPerGrid_fused_38_39);
+      auto task_fused_38_39 = alpaka::createTaskKernel<Acc>(workDiv_fused_38_39, fusedEltwiseKernel_38_39, alpaka::getPtrNative(deviceBuf_linear_4), alpaka::getPtrNative(deviceBuf_transpose_7), static_cast<Idx>(4194304));
+      alpaka::enqueue(queue, task_fused_38_39);
+   }
+
+//------ ReduceMean_GPU_ALPAKA
+   alpaka::WorkDivMembers<Dim, Idx> workDiv_mean(
+      Vec::all(Idx{32768}),
+      Vec::all(Idx{128u}),
+      Vec::all(Idx{1u}));
+   alpaka::exec<Acc>(queue, workDiv_mean, reduceKernel_ReduceMean_mean, alpaka::getPtrNative(deviceBuf_transpose_7), alpaka::getPtrNative(deviceBuf_mean), static_cast<std::size_t>((4194304) / (32768)), static_cast<std::size_t>(32768));
+
+//------ FUSED_REDUCTION_GPU_ALPAKA_41_42_43_44_45_46_47_48
+   {
+      alpaka::WorkDivMembers<Dim, Idx> workDiv_fused_41_42_43_44_45_46_47_48(
+         Vec::all(Idx{32768u}),
+         Vec::all(Idx{128u}),
+         Vec::all(Idx{1u}));
+      auto task_fused_41_42_43_44_45_46_47_48 = alpaka::createTaskKernel<Acc>(workDiv_fused_41_42_43_44_45_46_47_48, fusedEltwiseKernel_41_42_43_44_45_46_47_48, alpaka::getPtrNative(deviceBuf_transpose_7), alpaka::getPtrNative(deviceBuf_mean), alpaka::getPtrNative(deviceBuf_val_56), alpaka::getPtrNative(deviceBuf_val_59), alpaka::getPtrNative(deviceBuf_modelencoderlayers0residual_connections0normalpha), alpaka::getPtrNative(deviceBuf_val_60), alpaka::getPtrNative(deviceBuf_div));
+      alpaka::enqueue(queue, task_fused_41_42_43_44_45_46_47_48);
+   }
+
+//------ FUSED_REDUCTION_GPU_ALPAKA_49_50_51_52
+   {
+      alpaka::WorkDivMembers<Dim, Idx> workDiv_fused_49_50_51_52(
+         Vec::all(Idx{32768u}),
+         Vec::all(Idx{128u}),
+         Vec::all(Idx{1u}));
+      auto task_fused_49_50_51_52 = alpaka::createTaskKernel<Acc>(workDiv_fused_49_50_51_52, fusedEltwiseKernel_49_50_51_52, alpaka::getPtrNative(deviceBuf_div), alpaka::getPtrNative(deviceBuf_modelencoderlayers0residual_connections0normbias), alpaka::getPtrNative(deviceBuf_transpose_7), alpaka::getPtrNative(deviceBuf_add_189), alpaka::getPtrNative(deviceBuf_sub_81));
+      alpaka::enqueue(queue, task_fused_49_50_51_52);
+   }
+
+//------ FUSED_REDUCTION_GPU_ALPAKA_53_54_55_56_57_58_59_60
+   {
+      alpaka::WorkDivMembers<Dim, Idx> workDiv_fused_53_54_55_56_57_58_59_60(
+         Vec::all(Idx{32768u}),
+         Vec::all(Idx{128u}),
+         Vec::all(Idx{1u}));
+      auto task_fused_53_54_55_56_57_58_59_60 = alpaka::createTaskKernel<Acc>(workDiv_fused_53_54_55_56_57_58_59_60, fusedEltwiseKernel_53_54_55_56_57_58_59_60, alpaka::getPtrNative(deviceBuf_sub_81), alpaka::getPtrNative(deviceBuf_val_56), alpaka::getPtrNative(deviceBuf_val_59), alpaka::getPtrNative(deviceBuf_modelencoderlayers0residual_connections1normalpha), alpaka::getPtrNative(deviceBuf_val_60), alpaka::getPtrNative(deviceBuf_modelencoderlayers0residual_connections1normbias), alpaka::getPtrNative(deviceBuf_add_224));
+      alpaka::enqueue(queue, task_fused_53_54_55_56_57_58_59_60);
+   }
+
+//--------- Gemm_GPU_ALPAKA
+   char op_61_transA = 'n';
+   char op_61_transB = 'n';
+   int op_61_m = 16;
+   int op_61_n = 512;
+   int op_61_k = 128;
+   float op_61_alpha = 1;
+   float op_61_beta = 0;
+   blas.gemmrelu(op_61_transB, op_61_transA, op_61_n, 32768, op_61_k, op_61_alpha, static_cast<const float*>(alpaka::getPtrNative(deviceBuf_val_66)), static_cast<const float*>(alpaka::getPtrNative(deviceBuf_add_224)), op_61_beta, alpaka::getPtrNative(deviceBuf_modelencoderlayers0feed_forward_blocklinear_1bias), alpaka::getPtrNative(deviceBuf_relu_3));
+
+//--------- Gemm_GPU_ALPAKA
+   char op_63_transA = 'n';
+   char op_63_transB = 'n';
+   int op_63_m = 16;
+   int op_63_n = 128;
+   int op_63_k = 512;
+   float op_63_alpha = 1;
+   float op_63_beta = 0;
+   blas.gemm(op_63_transB, op_63_transA, op_63_n, 32768, op_63_k, op_63_alpha, static_cast<const float*>(alpaka::getPtrNative(deviceBuf_val_68)), static_cast<const float*>(alpaka::getPtrNative(deviceBuf_relu_3)), op_63_beta, alpaka::getPtrNative(deviceBuf_modelencoderlayers0feed_forward_blocklinear_2bias), alpaka::getPtrNative(deviceBuf_linear_6));
+
+//------ FUSED_REDUCTION_GPU_ALPAKA_64_65_66
+   {
+      alpaka::WorkDivMembers<Dim, Idx> workDiv_fused_64_65_66(
+         Vec::all(Idx{32768u}),
+         Vec::all(Idx{128u}),
+         Vec::all(Idx{1u}));
+      auto task_fused_64_65_66 = alpaka::createTaskKernel<Acc>(workDiv_fused_64_65_66, fusedEltwiseKernel_64_65_66, alpaka::getPtrNative(deviceBuf_add_189), alpaka::getPtrNative(deviceBuf_linear_6), alpaka::getPtrNative(deviceBuf_sub_100));
+      alpaka::enqueue(queue, task_fused_64_65_66);
+   }
+
+//------ FUSED_REDUCTION_GPU_ALPAKA_67_68_69_70_71_72_73_74
+   {
+      alpaka::WorkDivMembers<Dim, Idx> workDiv_fused_67_68_69_70_71_72_73_74(
+         Vec::all(Idx{32768u}),
+         Vec::all(Idx{128u}),
+         Vec::all(Idx{1u}));
+      auto task_fused_67_68_69_70_71_72_73_74 = alpaka::createTaskKernel<Acc>(workDiv_fused_67_68_69_70_71_72_73_74, fusedEltwiseKernel_67_68_69_70_71_72_73_74, alpaka::getPtrNative(deviceBuf_sub_100), alpaka::getPtrNative(deviceBuf_val_56), alpaka::getPtrNative(deviceBuf_val_59), alpaka::getPtrNative(deviceBuf_modelencodernormalpha), alpaka::getPtrNative(deviceBuf_val_60), alpaka::getPtrNative(deviceBuf_modelencodernormbias), alpaka::getPtrNative(deviceBuf_add_278));
+      alpaka::enqueue(queue, task_fused_67_68_69_70_71_72_73_74);
+   }
+
+//--------- Gemm_GPU_ALPAKA
+   char op_75_transA = 'n';
+   char op_75_transB = 'n';
+   int op_75_m = 16;
+   int op_75_n = 64;
+   int op_75_k = 128;
+   float op_75_alpha = 1;
+   float op_75_beta = 0;
+   blas.gemm(op_75_transB, op_75_transA, op_75_n, 32768, op_75_k, op_75_alpha, static_cast<const float*>(alpaka::getPtrNative(deviceBuf_val_75)), static_cast<const float*>(alpaka::getPtrNative(deviceBuf_add_278)), op_75_beta, alpaka::getPtrNative(deviceBuf_modelprojection_layerpooling_layerscore_layer0bias), alpaka::getPtrNative(deviceBuf_linear_7));
+
+//------ TANH_GPU_ALPAKA
+   auto const elementsPerThread_linear_7 = Vec::all(static_cast<Idx>(1));
+   auto const elementsPerGrid_linear_7 = Vec::all(Idx{2097152});
+   auto const workDiv_linear_7 = sofie_workdiv(elementsPerGrid_linear_7);
+   auto task_op_76 = alpaka::createTaskKernel<Acc>(workDiv_linear_7, tanhKernel, alpaka::getPtrNative(deviceBuf_linear_7), alpaka::getPtrNative(deviceBuf_tanh), static_cast<Idx>(2097152));
+   alpaka::enqueue(queue, task_op_76);
+
+//--------- Gemm_GPU_ALPAKA
+   char op_77_transA = 'n';
+   char op_77_transB = 'n';
+   int op_77_m = 16;
+   int op_77_n = 1;
+   int op_77_k = 64;
+   float op_77_alpha = 1;
+   float op_77_beta = 0;
+   blas.gemm(op_77_transB, op_77_transA, op_77_n, 32768, op_77_k, op_77_alpha, static_cast<const float*>(alpaka::getPtrNative(deviceBuf_val_77)), static_cast<const float*>(alpaka::getPtrNative(deviceBuf_tanh)), op_77_beta, alpaka::getPtrNative(deviceBuf_modelprojection_layerpooling_layerscore_layer2bias), alpaka::getPtrNative(deviceBuf_linear_8));
+
+//------ SOFTMAX_GPU_ALPAKA
+   alpaka::WorkDivMembers<Dim, Idx> workDiv_op_78(
+      Vec::all(static_cast<Idx>(2048)),
+      Vec::all(Idx{32u}),
+      Vec::all(Idx{1u}));
+   auto task_op_78 = alpaka::createTaskKernel<Acc>(workDiv_op_78, softmaxKernel_op_78, alpaka::getPtrNative(deviceBuf_linear_8), alpaka::getPtrNative(deviceBuf_softmax_1), static_cast<Idx>(2048));
+   alpaka::enqueue(queue, task_op_78);
+
+//------ FUSED_REDUCTION_GPU_ALPAKA_79_80
+   {
+      alpaka::WorkDivMembers<Dim, Idx> workDiv_fused_79_80(
+         Vec::all(Idx{262144u}),
+         Vec::all(Idx{32u}),
+         Vec::all(Idx{1u}));
+      auto task_fused_79_80 = alpaka::createTaskKernel<Acc>(workDiv_fused_79_80, fusedEltwiseKernel_79_80, alpaka::getPtrNative(deviceBuf_softmax_1), alpaka::getPtrNative(deviceBuf_add_278), alpaka::getPtrNative(deviceBuf_sum_1));
+      alpaka::enqueue(queue, task_fused_79_80);
+   }
+
+//--------- Gemm_GPU_ALPAKA
+   char op_81_transA = 'n';
+   char op_81_transB = 't';
+   int op_81_m = 2048;
+   int op_81_n = 64;
+   int op_81_k = 128;
+   float op_81_alpha = 1;
+   float op_81_beta = 0;
+   blas.gemmrelu(op_81_transB, op_81_transA, op_81_n, op_81_m, op_81_k, op_81_alpha, static_cast<const float*>(alpaka::getPtrNative(deviceBuf_modelprojection_layerlinear1weight)), static_cast<const float*>(alpaka::getPtrNative(deviceBuf_sum_1)), op_81_beta, alpaka::getPtrNative(deviceBuf_modelprojection_layerlinear1bias), alpaka::getPtrNative(deviceBuf_relu_4));
+
+//--------- Gemm_GPU_ALPAKA
+   char op_82_transA = 'n';
+   char op_82_transB = 't';
+   int op_82_m = 2048;
+   int op_82_n = 32;
+   int op_82_k = 64;
+   float op_82_alpha = 1;
+   float op_82_beta = 0;
+   blas.gemmrelu(op_82_transB, op_82_transA, op_82_n, op_82_m, op_82_k, op_82_alpha, static_cast<const float*>(alpaka::getPtrNative(deviceBuf_modelprojection_layerlinear2weight)), static_cast<const float*>(alpaka::getPtrNative(deviceBuf_relu_4)), op_82_beta, alpaka::getPtrNative(deviceBuf_modelprojection_layerlinear2bias), alpaka::getPtrNative(deviceBuf_relu_5));
+
+//--------- Gemm_GPU_ALPAKA
+   char op_83_transA = 'n';
+   char op_83_transB = 't';
+   int op_83_m = 2048;
+   int op_83_n = 1;
+   int op_83_k = 32;
+   float op_83_alpha = 1;
+   float op_83_beta = 0;
+   blas.gemm(op_83_transB, op_83_transA, op_83_n, op_83_m, op_83_k, op_83_alpha, static_cast<const float*>(alpaka::getPtrNative(deviceBuf_modelprojection_layerlinear_classifierweight)), static_cast<const float*>(alpaka::getPtrNative(deviceBuf_relu_5)), op_83_beta, alpaka::getPtrNative(deviceBuf_modelprojection_layerlinear_classifierbias), alpaka::getPtrNative(deviceBuf_linear_11));
+
+//--------- Gemm_GPU_ALPAKA
+   char op_85_transA = 'n';
+   char op_85_transB = 't';
+   int op_85_m = 2048;
+   int op_85_n = 1;
+   int op_85_k = 32;
+   float op_85_alpha = 1;
+   float op_85_beta = 0;
+   blas.gemm(op_85_transB, op_85_transA, op_85_n, op_85_m, op_85_k, op_85_alpha, static_cast<const float*>(alpaka::getPtrNative(deviceBuf_modelprojection_layerlinear_regressor_ptweight)), static_cast<const float*>(alpaka::getPtrNative(deviceBuf_relu_5)), op_85_beta, alpaka::getPtrNative(deviceBuf_modelprojection_layerlinear_regressor_ptbias), alpaka::getPtrNative(deviceBuf_linear_12));
+
+//--------- Gemm_GPU_ALPAKA
+   char op_87_transA = 'n';
+   char op_87_transB = 't';
+   int op_87_m = 2048;
+   int op_87_n = 1;
+   int op_87_k = 32;
+   float op_87_alpha = 1;
+   float op_87_beta = 0;
+   blas.gemm(op_87_transB, op_87_transA, op_87_n, op_87_m, op_87_k, op_87_alpha, static_cast<const float*>(alpaka::getPtrNative(deviceBuf_modelprojection_layerlinear_chargeweight)), static_cast<const float*>(alpaka::getPtrNative(deviceBuf_relu_5)), op_87_beta, alpaka::getPtrNative(deviceBuf_modelprojection_layerlinear_chargebias), alpaka::getPtrNative(deviceBuf_linear_13));
+
+//------ FUSED_ELTWISE_GPU_ALPAKA_84_89
+   {
+      auto const elementsPerThread_fused_84_89 = Vec::all(static_cast<Idx>(1));
+      auto const elementsPerGrid_fused_84_89 = Vec::all(Idx{2048});
+      auto const workDiv_fused_84_89 = sofie_workdiv(elementsPerGrid_fused_84_89);
+      auto task_fused_84_89 = alpaka::createTaskKernel<Acc>(workDiv_fused_84_89, fusedEltwiseKernel_84_89, alpaka::getPtrNative(deviceBuf_linear_11), alpaka::getPtrNative(deviceBuf_class_logit), static_cast<Idx>(2048));
+      alpaka::enqueue(queue, task_fused_84_89);
+   }
+
+//------ FUSED_ELTWISE_GPU_ALPAKA_88_90
+   {
+      auto const elementsPerThread_fused_88_90 = Vec::all(static_cast<Idx>(1));
+      auto const elementsPerGrid_fused_88_90 = Vec::all(Idx{2048});
+      auto const workDiv_fused_88_90 = sofie_workdiv(elementsPerGrid_fused_88_90);
+      auto task_fused_88_90 = alpaka::createTaskKernel<Acc>(workDiv_fused_88_90, fusedEltwiseKernel_88_90, alpaka::getPtrNative(deviceBuf_linear_13), alpaka::getPtrNative(deviceBuf_charge_logit), static_cast<Idx>(2048));
+      alpaka::enqueue(queue, task_fused_88_90);
+   }
+
+//------ FUSED_ELTWISE_GPU_ALPAKA_86_91
+   {
+      auto const elementsPerThread_fused_86_91 = Vec::all(static_cast<Idx>(1));
+      auto const elementsPerGrid_fused_86_91 = Vec::all(Idx{2048});
+      auto const workDiv_fused_86_91 = sofie_workdiv(elementsPerGrid_fused_86_91);
+      auto task_fused_86_91 = alpaka::createTaskKernel<Acc>(workDiv_fused_86_91, fusedEltwiseKernel_86_91, alpaka::getPtrNative(deviceBuf_linear_12), alpaka::getPtrNative(deviceBuf_reg_pt), static_cast<Idx>(2048));
+      alpaka::enqueue(queue, task_fused_86_91);
+   }
+}
+
+void infer(std::span<ViewConstF1D const> inputs, std::span<ViewF1D> outputs){
+   _infer_impl(inputs[0], inputs[1]);
+   alpaka::memcpy(queue, outputs[0], deviceBuf_class_logit);
+   alpaka::memcpy(queue, outputs[1], deviceBuf_charge_logit);
+   alpaka::memcpy(queue, outputs[2], deviceBuf_reg_pt);
+   // alpaka::wait(queue);
+}
+
+std::tuple<ViewF1D,ViewF1D,ViewF1D> infer(BufF1D const deviceBuf_particles,BufF1D const deviceBuf_padding_masks){
+   ViewConstF1D const view_particles{alpaka::getPtrNative(deviceBuf_particles), devAcc, alpaka::getExtents(deviceBuf_particles)};
+   ViewConstF1D const view_padding_masks{alpaka::getPtrNative(deviceBuf_padding_masks), devAcc, alpaka::getExtents(deviceBuf_padding_masks)};
+   _infer_impl(view_particles, view_padding_masks);
+   alpaka::wait(queue);
+   return {deviceBuf_class_logit,deviceBuf_charge_logit,deviceBuf_reg_pt};
+}
+
+std::tuple<ViewF1D,ViewF1D,ViewF1D> infer_nosync(BufF1D const deviceBuf_particles,BufF1D const deviceBuf_padding_masks){
+   ViewConstF1D const view_particles{alpaka::getPtrNative(deviceBuf_particles), devAcc, alpaka::getExtents(deviceBuf_particles)};
+   ViewConstF1D const view_padding_masks{alpaka::getPtrNative(deviceBuf_padding_masks), devAcc, alpaka::getExtents(deviceBuf_padding_masks)};
+   _infer_impl(view_particles, view_padding_masks);
+   return {deviceBuf_class_logit,deviceBuf_charge_logit,deviceBuf_reg_pt};
+}
+
+void resetState(QueueAcc& queue) {
+   alpaka::memset(queue, deviceBuf_reg_pt, 0);
+   alpaka::memset(queue, deviceBuf_class_logit, 0);
+   alpaka::memset(queue, deviceBuf_linear_12, 0);
+   alpaka::memset(queue, deviceBuf_sum_1, 0);
+   alpaka::memset(queue, deviceBuf_linear_8, 0);
+   alpaka::memset(queue, deviceBuf_linear_7, 0);
+   alpaka::memset(queue, deviceBuf_softmax_1, 0);
+   alpaka::memset(queue, deviceBuf_sub_100, 0);
+   alpaka::memset(queue, deviceBuf_transpose_4, 0);
+   alpaka::memset(queue, deviceBuf_relu_4, 0);
+   alpaka::memset(queue, deviceBuf_select, 0);
+   alpaka::memset(queue, deviceBuf_relu_5, 0);
+   alpaka::memset(queue, deviceBuf_select_2, 0);
+   alpaka::memset(queue, deviceBuf_transpose_5, 0);
+   alpaka::memset(queue, deviceBuf_select_1, 0);
+   alpaka::memset(queue, deviceBuf_relu, 0);
+   alpaka::memset(queue, deviceBuf_linear_13, 0);
+   alpaka::memset(queue, deviceBuf_transpose_1, 0);
+   alpaka::memset(queue, deviceBuf_transpose_6, 0);
+   alpaka::memset(queue, deviceBuf_layer_norm, 0);
+   alpaka::memset(queue, deviceBuf_linear_1, 0);
+   alpaka::memset(queue, deviceBuf_softmax, 0);
+   alpaka::memset(queue, deviceBuf_mul_74, 0);
+   alpaka::memset(queue, deviceBuf_linear, 0);
+   alpaka::memset(queue, deviceBuf_linear_5, 0);
+   alpaka::memset(queue, deviceBuf_charge_logit, 0);
+   alpaka::memset(queue, deviceBuf_transpose, 0);
+   alpaka::memset(queue, deviceBuf_bmm, 0);
+   alpaka::memset(queue, deviceBuf_linear_2, 0);
+   alpaka::memset(queue, deviceBuf_relu_3, 0);
+   alpaka::memset(queue, deviceBuf_relu_2, 0);
+   alpaka::memset(queue, deviceBuf_linear_11, 0);
+   alpaka::memset(queue, deviceBuf_linear_6, 0);
+   alpaka::memset(queue, deviceBuf_add_278, 0);
+   alpaka::memset(queue, deviceBuf_layer_norm_1, 0);
+   alpaka::memset(queue, deviceBuf_tanh, 0);
+   alpaka::memset(queue, deviceBuf_relu_1, 0);
+   alpaka::memset(queue, deviceBuf_div, 0);
+   alpaka::memset(queue, deviceBuf_layer_norm_2, 0);
+   alpaka::memset(queue, deviceBuf_linear_4, 0);
+   alpaka::memset(queue, deviceBuf_mean, 0);
+   alpaka::memset(queue, deviceBuf_transpose_7, 0);
+   alpaka::memset(queue, deviceBuf_linear_3, 0);
+   alpaka::memset(queue, deviceBuf_bmm_1, 0);
+   alpaka::memset(queue, deviceBuf_add_189, 0);
+   alpaka::memset(queue, deviceBuf_sub_81, 0);
+   alpaka::memset(queue, deviceBuf_add_224, 0);
+   alpaka::wait(queue);
+}
+};   // end of Session
+
+} // namespace ALPAKA_ACCELERATOR_NAMESPACE::l1sc::SOFIE_STT_ort_relu_fp32_b2048_s16
+
+#endif
