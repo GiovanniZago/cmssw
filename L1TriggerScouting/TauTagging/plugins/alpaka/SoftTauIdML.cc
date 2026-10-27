@@ -1,3 +1,4 @@
+#include <Eigen/Core>
 #include "DataFormats/L1ScoutingSoA/interface/alpaka/SoftTauDeviceTensor.h"
 #include "DataFormats/L1ScoutingSoA/interface/alpaka/AssociationMapDevice.h"
 #include "DataFormats/L1ScoutingSoA/interface/alpaka/BxLookupDevice.h"
@@ -13,6 +14,7 @@
 #include "HeterogeneousCore/AlpakaCore/interface/alpaka/MakerMacros.h"
 #include "HeterogeneousCore/AlpakaCore/interface/alpaka/stream/FixedQueueEDProducer.h"
 #include "HeterogeneousCore/AlpakaInterface/interface/config.h"
+#include "L1TriggerScouting/TauTagging/interface/SoftTauIdMLCommon.h"
 #include "L1TriggerScouting/TauTagging/plugins/alpaka/TransformKernel.h"
 #include "PhysicsTools/PyTorchAlpaka/interface/BatchedTensorCollection.h"
 #include "PhysicsTools/PyTorchAlpaka/interface/alpaka/AlpakaModel.h"
@@ -21,15 +23,24 @@
 
 namespace ALPAKA_ACCELERATOR_NAMESPACE::l1sc {
 
-  enum class Substep : uint8_t {
-    Sorting = 0, 
-    Reshaping = 1, 
-    Tagging = 2
-  };
-
-  Substep parseSubstep(std::string_view value) {
-    if (value == "sorting") {
-      return Substep::Sorting;
+class SoftTauIdML : public stream::FixedQueueEDProducer<> {
+ public:
+  SoftTauIdML(const edm::ParameterSet& params)
+      : FixedQueueEDProducer<>(params),
+        pf_candidates_token_(
+            consumes(params.getParameter<edm::InputTag>("srcCandidates"))),
+        bx_clusters_map_token_(
+            consumes(params.getParameter<edm::InputTag>("srcBxClustersMap"))),
+        cluster_cands_map_token_(consumes(
+            params.getParameter<edm::InputTag>("srcClustersCandsMap"))),
+        clusters_token_(
+            consumes(params.getParameter<edm::InputTag>("srcClusters"))),
+        cluster_cands_map_sorted_token_(produces("clusterCandsMapSorted")),
+        model_(params.getParameter<edm::FileInPath>("model").fullPath()),
+        substep_(parseSubstep(params.getParameter<std::string>("substep"))),
+        batch_size_(params.getParameter<uint32_t>("batchSize")) {
+    if (substep_ >= Substep::Reshaping) {
+      soft_tau_input_token_ = produces("softTauInputs");
     }
     if (value == "reshaping") {
       return Substep::Reshaping;

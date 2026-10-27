@@ -132,10 +132,11 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::sofie {
       }
     }
 
-    template <typename TView>
+    template <typename TView, typename TElem>
     static TView make_view(Queue& queue, std::byte* data, size_t n_elements) {
-      return TView{reinterpret_cast<typename TView::ElemType*>(data), alpaka::getDev(queue),
-                   typename TSession::Ext1D::all(static_cast<typename TSession::Idx>(n_elements))};
+      using Idx = typename TSession::Idx;
+      return TView{reinterpret_cast<TElem*>(data), alpaka::getDev(queue),
+                   typename TSession::Ext1D{Idx{n_elements}}};
     }
 
     // return a const view of the registered input; pack it into a staging buffer first if the
@@ -143,14 +144,14 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::sofie {
     typename TSession::ViewConstF1D stage_in(Queue& queue,
                                              cms::sofie::alpakatools::detail::ITensorHandle const& tensor,
                                              Staging& staging) const {
-      check_float(tensor);
+      // check_float(tensor);
       std::byte* data = static_cast<std::byte*>(tensor.data());
       if (not tensor.is_contiguous()) {
         staging.device = cms::alpakatools::make_device_buffer<std::byte[]>(queue, tensor.shape_bytes());
         detail::pack(queue, tensor.pack_descriptor(), data, staging.device->data());
         data = staging.device->data();
       }
-      return make_view<typename TSession::ViewConstF1D>(queue, data, elements(tensor));
+      return make_view<typename TSession::ViewConstF1D, const float>(queue, data, elements(tensor));
     }
 
     // return a writable view of the registered output, placed in a staging buffer (and later
@@ -164,7 +165,7 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::sofie {
         staging.device = cms::alpakatools::make_device_buffer<std::byte[]>(queue, tensor.shape_bytes());
         data = staging.device->data();
       }
-      return make_view<typename TSession::ViewF1D>(queue, data, elements(tensor));
+      return make_view<typename TSession::ViewF1D, float>(queue, data, elements(tensor));
     }
 
     std::string weights_path_;

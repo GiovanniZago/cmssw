@@ -1,11 +1,11 @@
 #ifndef DataFormats_L1ScoutingSoA_interface_alpaka_AssociationMapDevice_h
 #define DataFormats_L1ScoutingSoA_interface_alpaka_AssociationMapDevice_h
 
+#include "HeterogeneousCore/AlpakaInterface/interface/config.h"
 #include "DataFormats/L1ScoutingSoA/interface/AssociationMapHost.h"
 #include "DataFormats/L1ScoutingSoA/interface/AssociationMapSoA.h"
 #include "DataFormats/Portable/interface/alpaka/PortableCollection.h"
 #include "HeterogeneousCore/AlpakaInterface/interface/AssertDeviceMatchesHostCollection.h"
-#include "HeterogeneousCore/AlpakaInterface/interface/config.h"
 #include "HeterogeneousCore/AlpakaInterface/interface/concepts.h"
 
 namespace ALPAKA_ACCELERATOR_NAMESPACE::l1sc {

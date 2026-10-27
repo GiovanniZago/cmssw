@@ -1,3 +1,4 @@
+#include <Eigen/Core>
 #include "L1TriggerScouting/TauTagging/plugins/alpaka/TransformKernel.h"
 
 #include "HeterogeneousCore/AlpakaInterface/interface/HistoContainer.h"
