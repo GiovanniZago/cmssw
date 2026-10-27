@@ -1,3 +1,4 @@
+#include <Eigen/Core>
 #include "L1TriggerScouting/TauTagging/plugins/alpaka/TransformKernel.h"
 
 #include "DataFormats/L1ScoutingSoA/interface/SoftTauHostTensor.h"

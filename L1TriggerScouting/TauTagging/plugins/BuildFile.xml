@@ -24,6 +24,19 @@
   <use name="HeterogeneousCore/AlpakaInterface"/>
   <use name="PhysicsTools/PyTorchAlpaka"/>
   <use name="PerfTools/Perfetto"/>
-  <flags ALPAKA_BACKENDS="1"/>
+  <use name="PhysicsTools/SofieAlpaka"/>
+  <use name="sofieblas"/>
+  <use name="sofie"/>
+  <use name="openblas" for="alpaka/serial"/>
+  <use name="cuda-cublas" for="alpaka/cuda"/>
+  <use name="hipblas" for="alpaka/rocm"/>
+  <use name="hipblas-common" for="alpaka/rocm"/>
+  <use name="hipblaslt" for="alpaka/rocm"/>
+  <!-- host-side compilation of hipblas* 7.14 headers violates -Werror;
+       sofieBLAS_blaslt_common.tpp ignores a nodiscard hipError_t in device code.
+       Demote those diagnostics here (proper fix belongs in sofieBLAS). -->
+  <flags CXXFLAGS="-Wno-error=strict-aliasing -Wno-unused-but-set-variable -Wno-unused-result" for="alpaka/rocm"/>
+  <flags ROCM_FLAGS="-Wno-error=unused-value" for="alpaka/rocm"/>
+  <flags ALPAKA_BACKENDS="cuda"/>
   <flags EDM_PLUGIN="1"/>
 </library>

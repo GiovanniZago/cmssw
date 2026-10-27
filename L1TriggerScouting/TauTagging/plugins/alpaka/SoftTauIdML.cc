@@ -1,3 +1,4 @@
+#include <Eigen/Core>
 #include "DataFormats/L1ScoutingSoA/interface/alpaka/AssociationMapDevice.h"
 #include "DataFormats/L1ScoutingSoA/interface/alpaka/BxLookupDevice.h"
 #include "DataFormats/L1ScoutingSoA/interface/alpaka/ClustersDeviceCollection.h"
@@ -13,30 +14,13 @@
 #include "HeterogeneousCore/AlpakaCore/interface/alpaka/MakerMacros.h"
 #include "HeterogeneousCore/AlpakaCore/interface/alpaka/stream/FixedQueueEDProducer.h"
 #include "HeterogeneousCore/AlpakaInterface/interface/config.h"
+#include "L1TriggerScouting/TauTagging/interface/SoftTauIdMLCommon.h"
 #include "L1TriggerScouting/TauTagging/plugins/alpaka/TransformKernel.h"
 #include "PerfTools/Perfetto/interface/CMSSWPerfettoTrace.h"
 #include "PhysicsTools/PyTorchAlpaka/interface/BatchedTensorCollection.h"
 #include "PhysicsTools/PyTorchAlpaka/interface/alpaka/AlpakaModel.h"
 
 namespace ALPAKA_ACCELERATOR_NAMESPACE::l1sc {
-
-enum class Substep : uint8_t { Sorting = 0, Reshaping = 1, Tagging = 2 };
-
-Substep parseSubstep(std::string_view value) {
-  if (value == "sorting") {
-    return Substep::Sorting;
-  }
-  if (value == "reshaping") {
-    return Substep::Reshaping;
-  }
-  if (value == "tagging") {
-    return Substep::Tagging;
-  }
-
-  throw cms::Exception("Configuration")
-      << "Invalid substep value '" << value << "'. "
-      << "Allowed values are: sorting, reshaping, tagging.";
-}
 
 class SoftTauIdML : public stream::FixedQueueEDProducer<> {
  public:

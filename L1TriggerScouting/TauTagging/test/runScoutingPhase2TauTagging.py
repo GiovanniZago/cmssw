@@ -12,6 +12,14 @@ options.register ("tracePerfetto",
     "Generate trace with Perfetto"
 )
 
+# use sofie
+options.register ("useSofie",
+    False,
+    VarParsing.VarParsing.multiplicity.singleton,
+    VarParsing.VarParsing.varType.bool, 
+    "Use SOFIE-based producer"
+)
+
 # parse arguments
 options.parseArguments()
 
@@ -98,18 +106,33 @@ process.L1TScPhase2CLUEJetsProducer.candidates = cms.InputTag("unpacker", "candi
 process.L1TScPhase2CLUEJetsProducer.bxSizes = cms.InputTag("unpacker", "bxSizes")
 
 # sorting, reshaping, tagging
-process.softTaus = cms.EDProducer("l1sc::SoftTauIdML@alpaka", 
-    alpaka = cms.untracked.PSet(
-        backend = cms.untracked.string(options.backend)
-    ),
-    srcCandidates = cms.InputTag("unpacker", "candidates"), 
-    srcBxClustersMap = cms.InputTag("L1TScPhase2CLUEJetsProducer", "bxClustersMap"), 
-    srcClustersCandsMap = cms.InputTag("L1TScPhase2CLUEJetsProducer", "clustersCandsMap"), 
-    srcClusters = cms.InputTag("L1TScPhase2CLUEJetsProducer", "clusters"),
-    model = cms.FileInPath(options.model), 
-    substep = cms.string(options.pipelineStep), 
-    batchSize = cms.uint32(options.batchSize)
-)
+if options.useSofie:
+    options.model = "L1TriggerScouting/TauTagging/data/STT_ort_relu_fp32_b2048_s16_GPU_ALPAKA.dat"
+    process.softTaus = cms.EDProducer("l1sc::SoftTauIdMLSofie@alpaka", 
+        alpaka = cms.untracked.PSet(
+            backend = cms.untracked.string(options.backend)
+        ),
+        srcCandidates = cms.InputTag("unpacker", "candidates"), 
+        srcBxClustersMap = cms.InputTag("L1TScPhase2CLUEJetsProducer", "bxClustersMap"), 
+        srcClustersCandsMap = cms.InputTag("L1TScPhase2CLUEJetsProducer", "clustersCandsMap"), 
+        srcClusters = cms.InputTag("L1TScPhase2CLUEJetsProducer", "clusters"),
+        model = cms.FileInPath(options.model), 
+        substep = cms.string(options.pipelineStep), 
+        batchSize = cms.uint32(options.batchSize)
+    )
+else:
+    process.softTaus = cms.EDProducer("l1sc::SoftTauIdML@alpaka", 
+        alpaka = cms.untracked.PSet(
+            backend = cms.untracked.string(options.backend)
+        ),
+        srcCandidates = cms.InputTag("unpacker", "candidates"), 
+        srcBxClustersMap = cms.InputTag("L1TScPhase2CLUEJetsProducer", "bxClustersMap"), 
+        srcClustersCandsMap = cms.InputTag("L1TScPhase2CLUEJetsProducer", "clustersCandsMap"), 
+        srcClusters = cms.InputTag("L1TScPhase2CLUEJetsProducer", "clusters"),
+        model = cms.FileInPath(options.model), 
+        substep = cms.string(options.pipelineStep), 
+        batchSize = cms.uint32(options.batchSize)
+    )
 
 if step_mapper[options.pipelineStep] >= step_mapper["clustering"]:
     process.p_pipeline += process.L1TScPhase2CLUEJetsProducer

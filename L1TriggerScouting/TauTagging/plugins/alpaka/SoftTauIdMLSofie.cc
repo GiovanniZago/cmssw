@@ -1,3 +1,4 @@
+#include <Eigen/Core>
 #include "DataFormats/L1ScoutingSoA/interface/alpaka/AssociationMapDevice.h"
 #include "DataFormats/L1ScoutingSoA/interface/alpaka/BxLookupDevice.h"
 #include "DataFormats/L1ScoutingSoA/interface/alpaka/ClustersDeviceCollection.h"
@@ -13,30 +14,14 @@
 #include "HeterogeneousCore/AlpakaCore/interface/alpaka/MakerMacros.h"
 #include "HeterogeneousCore/AlpakaCore/interface/alpaka/stream/FixedQueueEDProducer.h"
 #include "HeterogeneousCore/AlpakaInterface/interface/config.h"
+#include "L1TriggerScouting/TauTagging/interface/SoftTauIdMLCommon.h"
+#include "L1TriggerScouting/TauTagging/plugins/alpaka/TransformKernel.h"
 #include "L1TriggerScouting/TauTagging/plugins/alpaka/STTSofieKernels.h"
 #include "PerfTools/Perfetto/interface/CMSSWPerfettoTrace.h"
 #include "PhysicsTools/SofieAlpaka/interface/TensorCollection.h"
 #include "PhysicsTools/SofieAlpaka/interface/alpaka/AlpakaModel.h"
 
 namespace ALPAKA_ACCELERATOR_NAMESPACE::l1sc {
-
-enum class Substep : uint8_t { Sorting = 0, Reshaping = 1, Tagging = 2 };
-
-Substep parseSubstep(std::string_view value) {
-  if (value == "sorting") {
-    return Substep::Sorting;
-  }
-  if (value == "reshaping") {
-    return Substep::Reshaping;
-  }
-  if (value == "tagging") {
-    return Substep::Tagging;
-  }
-
-  throw cms::Exception("Configuration")
-      << "Invalid substep value '" << value << "'. "
-      << "Allowed values are: sorting, reshaping, tagging.";
-}
 
 class SoftTauIdMLSofie : public stream::FixedQueueEDProducer<> {
  public:
@@ -51,7 +36,7 @@ class SoftTauIdMLSofie : public stream::FixedQueueEDProducer<> {
         clusters_token_(
             consumes(params.getParameter<edm::InputTag>("srcClusters"))),
         cluster_cands_map_sorted_token_(produces("clusterCandsMapSorted")),
-        model_<>(params.getParameter<edm::FileInPath>("model").fullPath()),
+        model_(params.getParameter<edm::FileInPath>("model").fullPath()),
         substep_(parseSubstep(params.getParameter<std::string>("substep"))),
         batch_size_(params.getParameter<uint32_t>("batchSize")) {
     if (substep_ >= Substep::Reshaping) {
@@ -72,34 +57,6 @@ class SoftTauIdMLSofie : public stream::FixedQueueEDProducer<> {
     desc.add<std::string>("substep", "tagging");
     desc.add<uint32_t>("batchSize", 32u);
     descriptions.addWithDefaultLabel(desc);
-  }
-
-  void beginStream(edm::StreamID, Queue queue) {
-    // Warming up the model with dummy data. This allows for fast inference
-    // since the first iteration and should ensure a more homogeneous memory
-    // balance
-
-    SoftTauInputDeviceTensor input_tensor(queue, batch_size_);
-    SoftTauOutputDeviceTensor output_tensor(queue, batch_size_);
-    auto input_records = input_tensor.view().records();
-    auto output_records = output_tensor.view().records();
-
-    for (auto ii = 0; ii < warmupIterations_; ++ii) {
-      cms::torch::alpakatools::TensorCollection<Queue> inputs_d, outputs_d;
-
-      // register inputs
-      inputs_d.add<SoftTauInputTensorSoA>("features", input_records.features());
-      inputs_d.add<SoftTauInputTensorSoA>("pad_mask", input_records.pad_mask());
-
-      // register outputs
-      outputs_d.add<SoftTauOutputTensorSoA>("cls", output_records.cls());
-      outputs_d.add<SoftTauOutputTensorSoA>("pt", output_records.pt());
-      outputs_d.add<SoftTauOutputTensorSoA>("charge", output_records.charge());
-
-      // inference on dummy data
-      // model_.forward(queue, inputs_d, outputs_d, ::torch::kHalf);
-      model_.forward(queue, inputs_d, outputs_d);
-    }
   }
 
   void produce(device::Event& event,
@@ -126,7 +83,7 @@ class SoftTauIdMLSofie : public stream::FixedQueueEDProducer<> {
         CMS_PERFETTO_SCOPE("Run Batched STT Inference");
 
         // initialize output tensor
-        const auto job_size = 2048; // for now assume a fixed batch
+        const auto job_size = cluster_cands_map.const_view().offset().metadata().size() - 1;
         auto output_tensor = SoftTauOutputDeviceTensor(event.queue(), job_size);
         output_tensor.zeroInitialise(event.queue());
 
@@ -141,26 +98,25 @@ class SoftTauIdMLSofie : public stream::FixedQueueEDProducer<> {
                 .records();  // pay A LOT OF attention here to constness
         auto output_records = output_tensor.view().records();
 
-        // batched tensors
-        cms::sofie::alpakatools::TensorCollection<Queue> inputs, outputs;
+        // batched inference
+        auto num_batches = (job_size + batch_size_ - 1) / batch_size_;
+        
+        for (unsigned int batch_idx = 0; batch_idx < (num_batches - 1); ++batch_idx) {
+            // batched tensors
+            cms::sofie::alpakatools::TensorCollection<Queue> inputs(batch_size_, job_size), outputs(batch_size_, job_size);
 
-        // register inputs
-        inputs.add<SoftTauInputTensorSoA>("features", batch_size_,
-                                            input_records.features());
-        inputs.add<SoftTauInputTensorSoA>("pad_mask", batch_size_,
-                                            input_records.pad_mask());
+            // add inputs
+            inputs.add<SoftTauInputTensorSoA>("features", batch_idx, input_records.features());
+            inputs.add<SoftTauInputTensorSoA>("pad_mask", batch_idx, input_records.pad_mask());
+            
+            // add outputs
+            outputs.add<SoftTauOutputTensorSoA>("cls", batch_idx, output_records.cls());
+            outputs.add<SoftTauOutputTensorSoA>("pt", batch_idx, output_records.pt());
+            outputs.add<SoftTauOutputTensorSoA>("charge", batch_idx, output_records.charge());
 
-        // register outputs
-        outputs.add<SoftTauOutputTensorSoA>("cls", batch_size_,
-                                            output_records.cls());
-        outputs.add<SoftTauOutputTensorSoA>("pt", batch_size_,
-                                            output_records.pt());
-        outputs.add<SoftTauOutputTensorSoA>("charge", batch_size_,
-                                            output_records.charge());
-
-        // do inference
-        // model_.forward(event.queue(), inputs, outputs, ::torch::kHalf);
-        model_.forward(event.queue(), inputs, outputs);
+            // run inference
+            model_.forward(event.queue(), inputs, outputs);
+        }   
 
         // emplace output
         event.emplace(soft_tau_output_token_, std::move(output_tensor));
@@ -192,7 +148,7 @@ class SoftTauIdMLSofie : public stream::FixedQueueEDProducer<> {
   // put ml output into event
   device::EDPutToken<SoftTauOutputDeviceTensor> soft_tau_output_token_;
   // model
-  sofie::AlpakaModel<SOFIE_STT_ort_relu_fp32_b2048_s16::Session> model_;
+  sofie::Model<SOFIE_STT_ort_relu_fp32_b2048_s16::Session<alpaka::AccToTag<Acc1D>>> model_;
   // processing step
   Substep substep_;
   // scouting switch

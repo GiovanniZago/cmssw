@@ -17,7 +17,7 @@
 #include <type_traits>
 #include <vector>
 
-#include "PhysicsTools/ONNXRuntimeAlpaka/interface/PackDescriptor.h"
+#include "PhysicsTools/SofieAlpaka/interface/PackDescriptor.h"
 
 namespace cms::sofie::alpakatools {
 
