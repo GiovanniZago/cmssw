@@ -20,8 +20,6 @@ namespace torchtest {
     }
   }
 
-  using namespace cms::torch;
-
   class TestModelJIT : public CppUnit::TestFixture {
   public:
     void testCtor_DefaultDeviceIsCpu();
@@ -52,7 +50,7 @@ namespace torchtest {
 
   void TestModelJIT::testCtor_DefaultDeviceIsCpu() {
     auto m_path = edm::FileInPath(modelPath).fullPath();
-    auto m = Model(m_path);
+    auto m = cms::torch::Model(m_path);
 
     CPPUNIT_ASSERT_EQUAL(::torch::kCPU, m.device().type());
   }
@@ -64,13 +62,13 @@ namespace torchtest {
 
     auto m_path = edm::FileInPath(modelPath).fullPath();
     forEachCudaDevice([&](auto dev) {
-      auto m = Model(m_path, dev);
+      auto m = cms::torch::Model(m_path, dev);
       CPPUNIT_ASSERT_EQUAL(dev, m.device());
     });
   }
 
   void TestModelJIT::testCtor_BadModelPathThrows() {
-    CPPUNIT_ASSERT_THROW(Model m("/not_existing_model.pt"), cms::Exception);
+    CPPUNIT_ASSERT_THROW(cms::torch::Model m("/not_existing_model.pt"), cms::Exception);
   }
 
   void TestModelJIT::testToDevice_UpdatesUnderlyingState() {
@@ -80,7 +78,7 @@ namespace torchtest {
 
     auto m_path = edm::FileInPath(modelPath).fullPath();
     forEachCudaDevice([&](auto dev) {
-      auto m = Model(m_path);
+      auto m = cms::torch::Model(m_path, false);
       m.to(dev);
 
       CPPUNIT_ASSERT_EQUAL(dev, m.device());
@@ -105,7 +103,7 @@ namespace torchtest {
 
     auto m_path = edm::FileInPath(modelPath).fullPath();
     forEachCudaDevice([&](auto dev) {
-      auto m = Model(m_path);
+      auto m = cms::torch::Model(m_path);
       m.to(dev, true);
 
       CPPUNIT_ASSERT_EQUAL(dev, m.device());
@@ -115,7 +113,7 @@ namespace torchtest {
   void TestModelJIT::testForward_IdempotentOutput() {
     auto m_path = edm::FileInPath(modelPath).fullPath();
     forEachCudaDevice([&](auto dev) {
-      auto m = Model(m_path);
+      auto m = cms::torch::Model(m_path);
       auto inputs = std::vector<torch::IValue>();
       inputs.push_back(torch::randn({batch_size_, 3}));
       auto out1 = m.forward(inputs).toTensor();
@@ -131,7 +129,7 @@ namespace torchtest {
 
     auto m_path = edm::FileInPath(modelPath).fullPath();
     forEachCudaDevice([&](auto dev) {
-      auto m = Model(m_path, dev);
+      auto m = cms::torch::Model(m_path, dev);
       auto inputs = std::vector<torch::IValue>();
       inputs.push_back(torch::randn({batch_size_, 3}, dev));
       auto out = m.forward(inputs).toTensor();
@@ -157,7 +155,7 @@ namespace torchtest {
       auto torch_stream = c10::cuda::getStreamFromExternal(stream, dev.index());
       c10::cuda::setCurrentCUDAStream(torch_stream);
 
-      auto m = Model(m_path);
+      auto m = cms::torch::Model(m_path);
       m.to(dev, true);
 
       auto inputs = std::vector<torch::IValue>();

@@ -1,5 +1,6 @@
 #include "DataFormats/PortableTestObjects/interface/TestSoA.h"
-#include "DataFormats/PortableTestObjects/interface/alpaka/TorchTestDeviceCollection.h"
+#include "DataFormats/PortableTestObjects/interface/alpaka/ImageDeviceCollection.h"
+#include "DataFormats/PortableTestObjects/interface/alpaka/LogitsDeviceCollection.h"
 #include "FWCore/ParameterSet/interface/ConfigurationDescriptions.h"
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
 #include "FWCore/ParameterSet/interface/ParameterSetDescription.h"
@@ -9,17 +10,13 @@
 #include "HeterogeneousCore/AlpakaCore/interface/alpaka/MakerMacros.h"
 #include "HeterogeneousCore/AlpakaCore/interface/alpaka/stream/FixedQueueEDProducer.h"
 #include "HeterogeneousCore/AlpakaInterface/interface/config.h"
-#include "PhysicsTools/PyTorchAlpaka/interface/QueueGuard.h"
-#include "PhysicsTools/PyTorchAlpaka/interface/TensorRegistry.h"
+#include "PhysicsTools/PyTorchAlpaka/interface/TensorCollection.h"
 #include "PhysicsTools/PyTorchAlpaka/interface/alpaka/AlpakaModel.h"
-#include "PhysicsTools/PyTorchAlpakaTest/plugins/Environment.h"
+#include "PhysicsTools/PyTorchAlpakaTest/interface/Environment.h"
 
 namespace ALPAKA_ACCELERATOR_NAMESPACE::torchtest {
 
-  using namespace torchportabletest;
-  using namespace cms::torch::alpakatools;
-
-  class TinyResNet : public stream::EDProducer<> {
+  class TinyResNet : public stream::FixedQueueEDProducer<> {
   public:
     TinyResNet(const edm::ParameterSet &params)
         : FixedQueueEDProducer<>(params),
@@ -39,25 +36,20 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::torchtest {
     void produce(device::Event &event, const device::EventSetup &event_setup) override {
       // in/out collections
       const auto &images = event.get(images_token_);
-      const auto batch_size = images.const_view().metadata().size();
-      auto logits = LogitsDeviceCollection(batch_size, event.queue());
+      const auto total_size = images.const_view().metadata().size();
+      auto logits = portabletest::LogitsDeviceCollection(event.queue(), total_size);
 
       // records
       auto input_records = images.const_view().records();
       auto output_records = logits.view().records();
       // input tensor definition
-      TensorRegistry<Device> inputs(batch_size);
-      inputs.register_tensor<Image>("images", input_records.r(), input_records.g(), input_records.b());
+      cms::torch::alpakatools::TensorCollection<Queue> inputs(total_size);
+      inputs.add<portabletest::ImageSoA>("images", input_records.r(), input_records.g(), input_records.b());
       // output tensor definition
-      TensorRegistry<Device> outputs(batch_size);
-      outputs.register_tensor<Logits>("logits", output_records.logits());
+      cms::torch::alpakatools::TensorCollection<Queue> outputs(total_size);
+      outputs.add<portabletest::LogitsSoA>("logits", output_records.logits());
 
-      // inference, queue guard restore stream when goes out of scope
-      {
-        QueueGuard<Queue> guard(event.queue());
-        model_.to(event.queue());
-        model_.forward(event.queue(), inputs, outputs);
-      }
+      model_.forward(event.queue(), inputs, outputs);
 
       // put device-side product into event
       event.emplace(logits_token_, std::move(logits));
@@ -65,8 +57,8 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::torchtest {
 
   private:
     // event query tokens
-    const device::EDGetToken<ImageDeviceCollection> images_token_;
-    const device::EDPutToken<LogitsDeviceCollection> logits_token_;
+    const device::EDGetToken<portabletest::ImageDeviceCollection> images_token_;
+    const device::EDPutToken<portabletest::LogitsDeviceCollection> logits_token_;
     // model
     torch::AlpakaModel model_;
     // debug mode flag
