@@ -20,6 +20,14 @@ options.register ("useSofie",
     "Use SOFIE-based producer"
 )
 
+# use TensorRT
+options.register ("useTRT",
+    False,
+    VarParsing.VarParsing.multiplicity.singleton,
+    VarParsing.VarParsing.varType.bool, 
+    "Use TensorRT-based producer"
+)
+
 # parse arguments
 options.parseArguments()
 
@@ -119,6 +127,20 @@ if options.useSofie:
         model = cms.FileInPath(options.model), 
         substep = cms.string(options.pipelineStep), 
         batchSize = cms.uint32(options.batchSize)
+    )
+elif options.useTRT:
+    process.ONNXService = cms.Service("ONNXService")
+    process.softTaus = cms.EDProducer("l1sc::SoftTauIdONNX@alpaka",
+        alpaka = cms.untracked.PSet(
+            backend = cms.untracked.string(options.backend)
+        ),
+        srcCandidates = cms.InputTag("unpacker", "candidates"),
+        srcBxClustersMap = cms.InputTag("L1TScPhase2CLUEJetsProducer", "bxClustersMap"),
+        srcClustersCandsMap = cms.InputTag("L1TScPhase2CLUEJetsProducer", "clustersCandsMap"),
+        srcClusters = cms.InputTag("L1TScPhase2CLUEJetsProducer", "clusters"),
+        model = cms.FileInPath("L1TriggerScouting/TauTagging/data/STT_ort_relu_fp16_b2048_s16_fallback.onnx"),
+        substep = cms.string(options.pipelineStep),
+        batchSize = cms.uint32(2048)
     )
 else:
     process.softTaus = cms.EDProducer("l1sc::SoftTauIdML@alpaka", 

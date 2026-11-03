@@ -9,7 +9,7 @@
 #include <alpaka/alpaka.hpp>
 #include <sofieBLAS/sofieBLAS.hpp>
 #include <span>
-#include "SOFIE/SOFIE_common.hxx"
+#include "SOFIE/utils/SOFIE_common.hxx"
 #include <fstream>
 
 #include "HeterogeneousCore/AlpakaInterface/interface/config.h"
@@ -74,6 +74,44 @@ inline alpaka::WorkDivMembers<TDim, TIdx> sofie_workdiv(
 #endif // SOFIE_ALPAKA_DEVICE_MATH_DEFINED
 
 namespace ALPAKA_ACCELERATOR_NAMESPACE::l1sc::SOFIE_STT_ort_relu_fp32_b2048_s16 {
+
+// Text-weight reader emitted by SOFIE 484f93cb; its utility headers do not export it.
+inline float ParseFloatToken(const std::string &s)
+{
+   if (s == "inf")
+      return std::numeric_limits<float>::infinity();
+   if (s == "-inf")
+      return -std::numeric_limits<float>::infinity();
+   if (s == "nan")
+      return std::numeric_limits<float>::quiet_NaN();
+   return std::stof(s);
+}
+
+template <class T>
+void ReadTensorFromStream(std::istream &is, T &target, std::string const &expectedName, std::size_t expectedLength)
+{
+   std::string name;
+   std::size_t length;
+   is >> name >> length;
+   if (name != expectedName) {
+      std::string err_msg =
+         "sofie failed to read the correct tensor name; expected name is " + expectedName + " , read " + name;
+      throw std::runtime_error(err_msg);
+   }
+   if (length != expectedLength) {
+      std::string err_msg = "sofie failed to read the correct tensor size; expected size is " +
+                            std::to_string(expectedLength) + " , read " + std::to_string(length);
+      throw std::runtime_error(err_msg);
+   }
+   std::string token;
+   for (std::size_t i = 0; i < length; ++i) {
+      is >> token;
+      target[i] = ParseFloatToken(token);
+   }
+   if (is.fail()) {
+      throw std::runtime_error("sofie failed to read the values for tensor " + expectedName);
+   }
+}
 
 //--- ALPAKA Kernels
 
@@ -1364,7 +1402,6 @@ std::vector<float> tensor_modelencoderlayers0feed_forward_blocklinear_2bias(128)
 std::vector<float> tensor_val_68(65536);
 
 //--- reading weights from file
-using SOFIE::ReadTensorFromStream;
    std::ifstream f;
    f.open(filename);
    if (!f.is_open()) {

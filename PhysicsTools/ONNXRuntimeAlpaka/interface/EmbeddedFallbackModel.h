@@ -2,7 +2,7 @@
 #define PhysicsTools_ONNXRuntimeAlpaka_interface_EmbeddedFallbackModel_h
 
 // Read the CMSSW-specific fallback ONNX ModelProto stored in ModelProto.metadata_props.
-// This deliberately reads only protobuf's outer length-delimited fields. 
+// This deliberately reads only protobuf's outer length-delimited fields.
 // It skips the EPContext graph without materializing the TensorRT plan.
 // ONNX ModelProto.metadata_props is field 14, StringStringEntryProto.key/value are 1/2.
 
@@ -96,11 +96,16 @@ namespace cms::Ort::alpakatools {
       if (encoded.empty() or (encoded.size() % 4 != 0))
         throw std::runtime_error("Invalid Base64 encoded fallback model");
       auto value = [](char c) -> int {
-        if (c >= 'A' and c <= 'Z') return c - 'A';
-        if (c >= 'a' and c <= 'z') return c - 'a' + 26;
-        if (c >= '0' and c <= '9') return c - '0' + 52;
-        if (c == '+') return 62;
-        if (c == '/') return 63;
+        if (c >= 'A' and c <= 'Z')
+          return c - 'A';
+        if (c >= 'a' and c <= 'z')
+          return c - 'a' + 26;
+        if (c >= '0' and c <= '9')
+          return c - '0' + 52;
+        if (c == '+')
+          return 62;
+        if (c == '/')
+          return 63;
         return -1;
       };
       std::string decoded;
@@ -111,14 +116,14 @@ namespace cms::Ort::alpakatools {
         const int b = value(encoded[i + 1]);
         const int c = encoded[i + 2] == '=' ? -2 : value(encoded[i + 2]);
         const int d = encoded[i + 3] == '=' ? -2 : value(encoded[i + 3]);
-        if (a < 0 or b < 0 or c == -1 or d == -1 or
-            (c == -2 and d != -2) or ((c == -2 or d == -2) and not last) or
+        if (a < 0 or b < 0 or c == -1 or d == -1 or (c == -2 and d != -2) or ((c == -2 or d == -2) and not last) or
             (c == -2 and (b & 0xf) != 0) or (d == -2 and c >= 0 and (c & 0x3) != 0))
           throw std::runtime_error("Invalid Base64 encoded fallback model");
         decoded.push_back(static_cast<char>((a << 2) | (b >> 4)));
         if (c >= 0) {
           decoded.push_back(static_cast<char>(((b & 15) << 4) | (c >> 2)));
-          if (d >= 0) decoded.push_back(static_cast<char>(((c & 3) << 6) | d));
+          if (d >= 0)
+            decoded.push_back(static_cast<char>(((c & 3) << 6) | d));
         }
       }
       return decoded;
@@ -127,26 +132,31 @@ namespace cms::Ort::alpakatools {
 
   inline std::optional<std::string> readEmbeddedFallbackModel(const std::string& path) {
     std::ifstream in(path, std::ios::binary);
-    if (!in) throw std::runtime_error("Cannot open ONNX model: " + path);
+    if (!in)
+      throw std::runtime_error("Cannot open ONNX model: " + path);
     std::optional<std::string> format;
     std::optional<std::string> payload;
     while (in.peek() != EOF) {
       const auto tag = detail::readPbVarint(in);
-      if (tag == 0) throw std::runtime_error("Invalid top-level ONNX protobuf tag");
+      if (tag == 0)
+        throw std::runtime_error("Invalid top-level ONNX protobuf tag");
       if ((tag >> 3) == 14 and (tag & 7) == 2) {
         auto entry = detail::parsePbStringPair(detail::readPbBytes(in, detail::readPbVarint(in)));
         if (entry.first == "cmssw.tensorrt_fallback.format") {
-          if (format) throw std::runtime_error("Duplicate fallback format metadata");
+          if (format)
+            throw std::runtime_error("Duplicate fallback format metadata");
           format = std::move(entry.second);
         } else if (entry.first == "cmssw.tensorrt_fallback.onnx_base64") {
-          if (payload) throw std::runtime_error("Duplicate fallback model metadata");
+          if (payload)
+            throw std::runtime_error("Duplicate fallback model metadata");
           payload = std::move(entry.second);
         }
       } else {
         detail::skipPbField(in, tag & 7);
       }
     }
-    if (!format and !payload) return std::nullopt;
+    if (!format and !payload)
+      return std::nullopt;
     if (format != "onnx-base64-v1" or !payload)
       throw std::runtime_error("Missing or unsupported CMSSW TensorRT fallback metadata");
     return detail::decodePbBase64(*payload);

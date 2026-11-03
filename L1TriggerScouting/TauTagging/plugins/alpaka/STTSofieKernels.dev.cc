@@ -140,7 +140,7 @@ void Session<Acc>::_infer_impl(ViewConstF1D const& deviceBuf_particles,ViewConst
    int op_31_k = 16;
    float op_31_alpha = 1;
    float op_31_beta = 0;
-   blas.gemmStridedBatched(op_31_transB, op_31_transA, 16, 16, 16, op_31_alpha, alpaka::getPtrNative(deviceBuf_transpose_5), 16, 256, alpaka::getPtrNative(deviceBuf_mul_74), 16, 256, op_31_beta, alpaka::getPtrNative(deviceBuf_bmm), 16, 256, 16384);
+   blas.gemmStridedBatched(op_31_transB, op_31_transA, 16, 16, 16, op_31_alpha, alpaka::getPtrNative(deviceBuf_transpose_5), 16, 256, alpaka::getPtrNative(deviceBuf_mul_74), 16, 256, op_31_beta, alpaka::getPtrNative(deviceBuf_bmm), 16, 256, 16384, Epilogue::Default, nullptr, 0);
 
 //------ SOFTMAX_GPU_ALPAKA
    alpaka::WorkDivMembers<Dim, Idx> workDiv_op_32(
@@ -158,7 +158,7 @@ void Session<Acc>::_infer_impl(ViewConstF1D const& deviceBuf_particles,ViewConst
    int op_33_k = 16;
    float op_33_alpha = 1;
    float op_33_beta = 0;
-   blas.gemmStridedBatched(op_33_transB, op_33_transA, 16, 16, 16, op_33_alpha, alpaka::getPtrNative(deviceBuf_transpose_4), 16, 256, alpaka::getPtrNative(deviceBuf_softmax), 16, 256, op_33_beta, alpaka::getPtrNative(deviceBuf_bmm_1), 16, 256, 16384);
+   blas.gemmStridedBatched(op_33_transB, op_33_transA, 16, 16, 16, op_33_alpha, alpaka::getPtrNative(deviceBuf_transpose_4), 16, 256, alpaka::getPtrNative(deviceBuf_softmax), 16, 256, op_33_beta, alpaka::getPtrNative(deviceBuf_bmm_1), 16, 256, 16384, Epilogue::Default, nullptr, 0);
 
 //------ TRANSPOSE_GPU_ALPAKA
    auto const elementsPerThread_transpose_6 = Vec::all(static_cast<Idx>(1));

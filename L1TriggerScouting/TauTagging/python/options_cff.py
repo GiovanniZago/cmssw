@@ -17,7 +17,7 @@ options.register ("pipelineStep",
 )
 
 options.register ("model", 
-    "L1TriggerScouting/TauTagging/data/STT_jit.pt", 
+    "L1TriggerScouting/TauTagging/data/STT_jit_relu.pt", 
     VarParsing.VarParsing.multiplicity.singleton, 
     VarParsing.VarParsing.varType.string,
     "PyTorch model to be used."

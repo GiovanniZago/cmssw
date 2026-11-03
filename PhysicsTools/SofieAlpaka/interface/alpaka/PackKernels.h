@@ -12,7 +12,10 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::sofie::detail {
   void pack(Queue& queue, cms::sofie::alpakatools::PackDescriptor const& desc, std::byte const* soa, std::byte* buffer);
 
   // Scatter the elements of a contiguous, row-major buffer into a strided SoA tensor.
-  void unpack(Queue& queue, cms::sofie::alpakatools::PackDescriptor const& desc, std::byte const* buffer, std::byte* soa);
+  void unpack(Queue& queue,
+              cms::sofie::alpakatools::PackDescriptor const& desc,
+              std::byte const* buffer,
+              std::byte* soa);
 
 }  // namespace ALPAKA_ACCELERATOR_NAMESPACE::sofie::detail
 

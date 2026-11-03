@@ -98,4 +98,4 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::sofie::detail {
     launch<UnpackKernel>(queue, desc, buffer, soa);
   }
 
-}  // namespace ALPAKA_ACCELERATOR_NAMESPACE::ort::detail
+}  // namespace ALPAKA_ACCELERATOR_NAMESPACE::sofie::detail

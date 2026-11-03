@@ -54,8 +54,8 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::sofie {
                  cms::sofie::alpakatools::TensorCollection<Queue>& inputs,
                  cms::sofie::alpakatools::TensorCollection<Queue>& outputs) {
       if (alpaka::getDev(queue) != alpaka::getDev(session_.queue)) {
-        throw cms::Exception("LogicError") << "SOFIE model " << weights_path_
-                                           << " used on a different device than the one of its session queue.";
+        throw cms::Exception("LogicError")
+            << "SOFIE model " << weights_path_ << " used on a different device than the one of its session queue.";
       }
 
       // empty tensors carry no work
@@ -97,10 +97,8 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::sofie {
       for (size_t i = 0; i < outputs.size(); ++i) {
         auto& st = staging[inputs.size() + i];
         if (st.device)
-          detail::unpack(run_queue,
-                         outputs[i].pack_descriptor(),
-                         st.device->data(),
-                         static_cast<std::byte*>(outputs[i].data()));
+          detail::unpack(
+              run_queue, outputs[i].pack_descriptor(), st.device->data(), static_cast<std::byte*>(outputs[i].data()));
       }
 
       // let the event queue resume only when the inference is complete
@@ -127,16 +125,15 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::sofie {
     void check_float(const cms::sofie::alpakatools::detail::ITensorHandle& tensor) const {
       if (tensor.bytes() != sizeof(float)) {
         throw cms::Exception("InvalidArgument")
-            << "SOFIE model " << weights_path_ << " expects float tensors, but a tensor of "
-            << tensor.bytes() << "-byte elements was registered.";
+            << "SOFIE model " << weights_path_ << " expects float tensors, but a tensor of " << tensor.bytes()
+            << "-byte elements was registered.";
       }
     }
 
     template <typename TView, typename TElem>
     static TView make_view(Queue& queue, std::byte* data, size_t n_elements) {
       using Idx = typename TSession::Idx;
-      return TView{reinterpret_cast<TElem*>(data), alpaka::getDev(queue),
-                   typename TSession::Ext1D{Idx{n_elements}}};
+      return TView{reinterpret_cast<TElem*>(data), alpaka::getDev(queue), typename TSession::Ext1D{Idx{n_elements}}};
     }
 
     // return a const view of the registered input; pack it into a staging buffer first if the
