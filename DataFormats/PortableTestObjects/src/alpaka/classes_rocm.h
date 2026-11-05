@@ -1,4 +1,3 @@
-// these first to make sure they get included before any SoA header
 #include <Eigen/Core>
 #include <Eigen/Dense>
 
@@ -11,6 +10,7 @@
 #include "DataFormats/PortableTestObjects/interface/alpaka/TestDeviceObject.h"
 
 #include "DataFormats/PortableTestObjects/interface/alpaka/ParticleDeviceCollection.h"
+#include "DataFormats/PortableTestObjects/interface/alpaka/HitDeviceCollection.h"
 #include "DataFormats/PortableTestObjects/interface/alpaka/ImageDeviceCollection.h"
 #include "DataFormats/PortableTestObjects/interface/alpaka/LogitsDeviceCollection.h"
 #include "DataFormats/PortableTestObjects/interface/alpaka/SimpleNetDeviceCollection.h"
