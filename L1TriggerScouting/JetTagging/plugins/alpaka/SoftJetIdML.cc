@@ -73,8 +73,8 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::l1sc {
           outputs_d.add<SoftJetOutputTensorSoA>("softmax", output_records.output());
       
           // inference on dummy data
-          // model_.forward(queue, inputs_d, outputs_d, ::torch::kHalf);
-          model_.forward(queue, inputs_d, outputs_d);
+          model_.forward(queue, inputs_d, outputs_d, ::torch::kHalf);
+          // model_.forward(queue, inputs_d, outputs_d);
         }
       }
 

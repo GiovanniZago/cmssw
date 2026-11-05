@@ -37,10 +37,11 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::l1sc {
           cluster_cands_map_token_(consumes(params.getParameter<edm::InputTag>("srcClustersCandsMap"))),
           clusters_token_(consumes(params.getParameter<edm::InputTag>("srcClusters"))),
           cluster_cands_map_sorted_token_(produces("clusterCandsMapSorted")),
-          model_(params.getParameter<edm::FileInPath>("model").fullPath(), cms::Ort::Backend::tensorRT),
+          // model_(params.getParameter<edm::FileInPath>("model").fullPath(), cms::Ort::Backend::tensorRT),
+          model_(params.getParameter<edm::FileInPath>("model").fullPath()),
           substep_(parseSubstep(params.getParameter<std::string>("substep"))),
           batch_size_(params.getParameter<uint32_t>("batchSize")) {
-      if (batch_size_ == 0) {
+      if (batch_size_ <= 0) {
         throw cms::Exception("Configuration") << "SoftTauIdONNX: batchSize must be positive";
       }
       if (substep_ >= Substep::Reshaping) {

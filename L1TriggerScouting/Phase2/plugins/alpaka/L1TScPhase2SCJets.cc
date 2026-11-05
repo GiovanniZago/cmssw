@@ -34,8 +34,8 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::l1sc {  // place module in backend-speci
     L1TScPhase2SCJets(const edm::ParameterSet& params)
         : EDProducer<>(params),
 
-          src_candidates_token_{consumes(params.getParameter<edm::InputTag>("src"))},
-          bx_lookup_token_{consumes(params.getParameter<edm::InputTag>("src"))},
+          src_candidates_token_{consumes(params.getParameter<edm::InputTag>("srcCandidates"))},
+          bx_lookup_token_{consumes(params.getParameter<edm::InputTag>("srcBxLookup"))},
 
           clusters_token_{produces()},
           jetBXs_token_{produces()},
@@ -192,7 +192,8 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::l1sc {  // place module in backend-speci
       edm::ParameterSetDescription desc;
 
       // define input parameters
-      desc.add<edm::InputTag>("src");
+      desc.add<edm::InputTag>("srcCandidates");
+      desc.add<edm::InputTag>("srcBxLookup");
 
       // minimum number of constituents for a jet to be kept (applied in the
       // common finalize step for all algorithms; 1 keeps everything)

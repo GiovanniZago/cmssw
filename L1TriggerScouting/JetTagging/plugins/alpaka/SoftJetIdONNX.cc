@@ -21,13 +21,9 @@
 #include "L1TriggerScouting/JetTagging/plugins/alpaka/TransformKernelONNX.h"
 #include "PhysicsTools/ONNXRuntimeAlpaka/interface/TensorCollection.h"
 #include "PhysicsTools/ONNXRuntimeAlpaka/interface/alpaka/AlpakaSession.h"
+#include "PerfTools/Perfetto/interface/CMSSWPerfettoTrace.h"
 
 namespace ALPAKA_ACCELERATOR_NAMESPACE::l1sc {
-
-  struct BatchIO {
-    cms::Ort::alpakatools::TensorCollection<Queue> inputs;
-    cms::Ort::alpakatools::TensorCollection<Queue> outputs;
-  };
 
   // ONNX Runtime counterpart of SoftJetIdML: jets' constituents are transformed
   // on device into the ParticleTransformer input tensors, scored with ONNX
@@ -47,7 +43,7 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::l1sc {
           vertex_token_{consumes(params.getParameter<edm::InputTag>("vertices"))},
           vertex_bx_lookup_token_{consumes(params.getParameter<edm::InputTag>("vertexBxLookup"))},
           soft_jet_token_{produces()},
-          session_(params.getParameter<edm::FileInPath>("model").fullPath()),
+          session_(params.getParameter<edm::FileInPath>("model").fullPath(), cms::Ort::Backend::tensorRT),
           max_batch_size_{params.getParameter<uint32_t>("maxBatchSize")} {}
 
     static void fillDescriptions(edm::ConfigurationDescriptions& descriptions) {
@@ -62,7 +58,21 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::l1sc {
       descriptions.addWithDefaultLabel(desc);
     }
 
+    void beginStream(edm::StreamID id, Queue queue) override {
+      // Create the ONNX Runtime session on this producer's fixed Alpaka queue.
+      // The selected execution provider is TensorRT (see constructor).
+      session_.bind(queue);
+
+      edm::LogInfo("SoftJetIdONNX")
+        << "Stream " << id.value()
+        << ": using "
+        << (session_.usedCudaFallback() ? "CUDA fallback" : "TensorRT")
+        << " execution provider";
+
+    }
+
     void produce(device::Event& event, const device::EventSetup& event_setup) override {
+      CMS_PERFETTO_SCOPE("SoftJetIdONNX produce()");
       // input collections
       const auto& pf = event.get(pf_token_);
       const auto& association_map = event.get(association_map_token_);
@@ -77,6 +87,7 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::l1sc {
       output_tensor.zeroInitialise(event.queue());
 
       if (job_size > 0) {
+        CMS_PERFETTO_SCOPE("Run Batched SoftJet ONNX Inference");
         const auto batch_size = std::min<uint32_t>(job_size, max_batch_size_);
         const auto num_batches = (job_size + batch_size - 1) / batch_size;
 
@@ -86,24 +97,21 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::l1sc {
         auto input_records = input_tensor.view().records();
         auto output_records = scores.view().records();
 
-        std::deque<BatchIO> batches;
-        for (uint32_t batch_idx = 0; batch_idx < num_batches; ++batch_idx) {
-          BatchIO batch{cms::Ort::alpakatools::TensorCollection<Queue>(batch_size, job_size),
-                        cms::Ort::alpakatools::TensorCollection<Queue>(batch_size, job_size)};
+        for (uint32_t batch_idx = 0; batch_idx < (num_batches - 1); ++batch_idx) {
+          cms::Ort::alpakatools::TensorCollection<Queue> inputs(static_cast<int>(batch_size),
+                                                                static_cast<int>(job_size));
+          cms::Ort::alpakatools::TensorCollection<Queue> outputs(static_cast<int>(batch_size),
+                                                                  static_cast<int>(job_size));
 
-          batch.inputs.add<SoftJetONNXInputTensorSoA>("pf_features", batch_idx, input_records.features());
-          batch.inputs.add<SoftJetONNXInputTensorSoA>("pf_vectors", batch_idx, input_records.vectors());
-          batch.inputs.add<SoftJetONNXInputTensorSoA>("pf_mask", batch_idx, input_records.mask());
+          inputs.add<SoftJetONNXInputTensorSoA>("pf_features", batch_idx, input_records.features());
+          inputs.add<SoftJetONNXInputTensorSoA>("pf_vectors", batch_idx, input_records.vectors());
+          inputs.add<SoftJetONNXInputTensorSoA>("pf_mask", batch_idx, input_records.mask());
 
-          batch.outputs.add<SoftJetONNXScoresSoA>("softmax", batch_idx, output_records.b(), output_records.notB());
+          outputs.add<SoftJetONNXScoresSoA>("softmax", batch_idx, output_records.b(), output_records.notB());
 
-          batches.push_back(std::move(batch));
-        }
-
-        for (auto& batch : batches) {
           // ONNX Runtime writes the softmax scores to the staged [batch, 2]
           // buffers, and unpacks them into the scores SoA columns
-          session_.forward(event.queue(), batch.inputs, batch.outputs);
+          session_.forward(event.queue(), inputs, outputs);
         }
 
         // extract the b-jet score into the output tensor

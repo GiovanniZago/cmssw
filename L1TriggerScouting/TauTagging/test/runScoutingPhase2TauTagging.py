@@ -138,7 +138,7 @@ elif options.useTRT:
         srcBxClustersMap = cms.InputTag("L1TScPhase2CLUEJetsProducer", "bxClustersMap"),
         srcClustersCandsMap = cms.InputTag("L1TScPhase2CLUEJetsProducer", "clustersCandsMap"),
         srcClusters = cms.InputTag("L1TScPhase2CLUEJetsProducer", "clusters"),
-        model = cms.FileInPath("L1TriggerScouting/TauTagging/data/STT_ort_relu_fp16_b2048_s16_fallback.onnx"),
+        model = cms.FileInPath("L1TriggerScouting/TauTagging/data/STT_ort_relu_fp16_b2048_s16.onnx"),
         substep = cms.string(options.pipelineStep),
         batchSize = cms.uint32(2048)
     )
