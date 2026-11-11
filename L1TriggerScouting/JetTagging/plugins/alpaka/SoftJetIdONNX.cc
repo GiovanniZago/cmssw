@@ -43,7 +43,8 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::l1sc {
           vertex_token_{consumes(params.getParameter<edm::InputTag>("vertices"))},
           vertex_bx_lookup_token_{consumes(params.getParameter<edm::InputTag>("vertexBxLookup"))},
           soft_jet_token_{produces()},
-          session_(params.getParameter<edm::FileInPath>("model").fullPath(), cms::Ort::Backend::tensorRT),
+          // session_(params.getParameter<edm::FileInPath>("model").fullPath(), cms::Ort::Backend::tensorRT),
+          session_(params.getParameter<edm::FileInPath>("model").fullPath()),
           max_batch_size_{params.getParameter<uint32_t>("maxBatchSize")} {}
 
     static void fillDescriptions(edm::ConfigurationDescriptions& descriptions) {

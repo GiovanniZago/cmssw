@@ -32,8 +32,8 @@ if [ "$#" -eq "8" ]; then
         die "Expected 'trace' after 'sofie' or 'trt'; got '$8'" 1
     fi
 fi
-if [ "${TRACE}" == "True" ] && [ "$2" -gt "40" ]; then
-    die "Trying to run a Perfetto-traced job with more than 40 events, not allowed!" 1
+if [ "${TRACE}" == "True" ] && [ "$2" -gt "500" ]; then
+    die "Trying to run a Perfetto-traced job with more than 100 events, not allowed!" 1
 fi
 if [[ "$1" =~ ^(cpu|cpu-dump|cuda|cuda-dump|rocm)$ ]]; then
     TARGET=$1

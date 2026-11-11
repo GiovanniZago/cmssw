@@ -136,13 +136,13 @@ if options.pipelineStep == "tagging":
     if options.useTRT:
         process.ONNXService = cms.Service("ONNXService")
         producer = "l1sc::SoftJetIdONNX@alpaka"
-        default_model = "L1TriggerScouting/JetTagging/data/btagging/model_example_ParticleTransformer.bs512.int8.fallback.onnx"
+        default_model = "L1TriggerScouting/JetTagging/data/btagging/model_example_ParticleTransformer_fp16.bs512.onnx"
         default_batch_size = 512
     else:
         process.PyTorchService = cms.Service("PyTorchService")
         producer = "l1sc::SoftJetIdML@alpaka"
         default_model = "L1TriggerScouting/JetTagging/data/btagging/softjet_part_unique.pt"
-        default_batch_size = 32
+        default_batch_size = 512
 
     process.softJets = cms.EDProducer(producer,
         alpaka=cms.untracked.PSet(backend=cms.untracked.string(options.backend)),

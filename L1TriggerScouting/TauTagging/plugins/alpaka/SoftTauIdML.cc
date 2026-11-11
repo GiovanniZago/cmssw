@@ -77,8 +77,8 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::l1sc {
           outputs_d.add<SoftTauOutputTensorSoA>("charge", output_records.charge());
 
           // inference on dummy data
-          // model_.forward(queue, inputs_d, outputs_d, ::torch::kHalf);
-          model_.forward(queue, inputs_d, outputs_d);
+          model_.forward(queue, inputs_d, outputs_d, ::torch::kHalf);
+          // model_.forward(queue, inputs_d, outputs_d);
         }
       }
 
@@ -128,8 +128,8 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::l1sc {
             outputs.addBatched<SoftTauOutputTensorSoA>("charge", batch_size_, output_records.charge());
 
             // do inference
-            // model_.forward(event.queue(), inputs, outputs, ::torch::kHalf);
-            model_.forward(event.queue(), inputs, outputs);
+            model_.forward(event.queue(), inputs, outputs, ::torch::kHalf);
+            // model_.forward(event.queue(), inputs, outputs);
 
             // emplace output
             event.emplace(soft_tau_output_token_, std::move(output_tensor));

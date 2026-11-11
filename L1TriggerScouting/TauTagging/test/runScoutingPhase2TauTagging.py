@@ -90,7 +90,7 @@ stream file for PF barrel and one stream file for PF endcap. Hence:
   convenient to then automatically generate the range of stream IDs directly from it. This is convenient also if PF barrel and PF
   endcap are going to be split among multiple streams in the same buBaseDir.
 """
-process.unpacker = cms.EDProducer("l1sc::L1TScPhase2PuppiRawToDigiV2@alpaka",
+process.unpacker = cms.EDProducer("l1sc::L1TScPhase2PuppiRawToDigi@alpaka",
     alpaka = cms.untracked.PSet(
         backend = cms.untracked.string(options.backend)
     ),
@@ -99,7 +99,7 @@ process.unpacker = cms.EDProducer("l1sc::L1TScPhase2PuppiRawToDigiV2@alpaka",
         *list(range(options.buNumStreams[0])) # here we assume that buNumStreams[0] corresponds to the number of streams of PF candidates
         if options.pfBarrelStreamIDs == [] else options.pfBarrelStreamIDs + options.pfEndcapStreamIDs
     ),
-    splitFactor = cms.uint32(2)
+    splitFactor = cms.uint32(45) # pay a lot of attention to splitfactor
 )
 process.p_pipeline += process.unpacker
 
@@ -138,7 +138,7 @@ elif options.useTRT:
         srcBxClustersMap = cms.InputTag("L1TScPhase2CLUEJetsProducer", "bxClustersMap"),
         srcClustersCandsMap = cms.InputTag("L1TScPhase2CLUEJetsProducer", "clustersCandsMap"),
         srcClusters = cms.InputTag("L1TScPhase2CLUEJetsProducer", "clusters"),
-        model = cms.FileInPath("L1TriggerScouting/TauTagging/data/STT_ort_relu_fp16_b2048_s16.onnx"),
+        model = cms.FileInPath("L1TriggerScouting/TauTagging/data/STT_ort_relu_fp32_b2048_s16.onnx"),
         substep = cms.string(options.pipelineStep),
         batchSize = cms.uint32(2048)
     )

@@ -2,7 +2,7 @@
 # Build a self-contained TensorRT EPContext + FP16 CUDA fallback ONNX artifact.
 # Requires NVIDIA ModelOpt, ONNX Python package and TensorRT exporter.
 EXPORTER="/home/gizago/build/el9_amd64_gcc14/external/tensorrt-exporter/11.4.0.106-6c474231352306affb905f3de94141b4"
-QLEVEL="int8"
+QLEVEL="fp16"
 
 # setup python environment
 source /cvmfs/sft.cern.ch/lcg/views/LCG_110/x86_64-el9-gcc14-opt/setup.sh
@@ -18,10 +18,10 @@ SCRIPTS="/home/gizago/CMSSW_20_1_0_pre4/src/L1TriggerScouting/TauTagging/utiliti
 # QUANTIZED_MODEL="/home/gizago/CMSSW_20_1_0_pre4/src/L1TriggerScouting/TauTagging/data/STT_ort_relu_${QLEVEL}_b2048_s16.onnx"
 # ENGINE="/home/gizago/CMSSW_20_1_0_pre4/src/L1TriggerScouting/TauTagging/data/STT_ort_relu_${QLEVEL}_b2048_s16.plan"
 # OUTPUT="/home/gizago/CMSSW_20_1_0_pre4/src/L1TriggerScouting/TauTagging/data/STT_ort_relu_${QLEVEL}_b2048_s16_fallback.onnx"
-MODEL="/home/gizago/CMSSW_20_1_0_pre4/src/L1TriggerScouting/JetTagging/data/btagging/model_example_ParticleTransformer.bs512.onnx"
-QUANTIZED_MODEL="/home/gizago/CMSSW_20_1_0_pre4/src/L1TriggerScouting/JetTagging/data/btagging/model_example_ParticleTransformer.bs512.${QLEVEL}.onnx"
-ENGINE="/home/gizago/CMSSW_20_1_0_pre4/src/L1TriggerScouting/JetTagging/data/btagging/model_example_ParticleTransformer.bs512.${QLEVEL}.plan"
-OUTPUT="/home/gizago/CMSSW_20_1_0_pre4/src/L1TriggerScouting/JetTagging/data/btagging/model_example_ParticleTransformer.bs512.${QLEVEL}.fallback.onnx"
+MODEL="/home/gizago/CMSSW_20_1_0_pre4/src/L1TriggerScouting/JetTagging/data/btagging/softjet_part_example.onnx"
+QUANTIZED_MODEL="/home/gizago/CMSSW_20_1_0_pre4/src/L1TriggerScouting/JetTagging/data/btagging/softjet_part_example_${QLEVEL}.onnx"
+ENGINE="/home/gizago/CMSSW_20_1_0_pre4/src/L1TriggerScouting/JetTagging/data/btagging/softjet_part_example_${QLEVEL}.plan"
+OUTPUT="/home/gizago/CMSSW_20_1_0_pre4/src/L1TriggerScouting/JetTagging/data/btagging/softjet_part_example_${QLEVEL}_fallback.onnx"
 
 [[ -f "$MODEL" ]] || { echo "Missing input model: $MODEL" >&2; exit 1; }
 [[ -x "$TRTEXEC" ]] || { echo "Missing executable: $TRTEXEC" >&2; exit 1; }
@@ -35,22 +35,33 @@ import sys
 
 import onnx
 from modelopt.onnx.quantization import quantize
+from modelopt.onnx.autocast import convert_to_mixed_precision
 
 input_path, output_path = sys.argv[1:3]
 
-quantize(
+converted = convert_to_mixed_precision(
     onnx_path=input_path,
-    output_path=output_path,
-    quantize_mode="int8",
+    low_precision_type="fp16",
     calibration_data=None,
-    calibration_method="max",
-    calibration_eps=["cpu"],
-    high_precision_dtype="fp32",
-    direct_io_types=False,
+    keep_io_types=True,
 )
 
-converted = onnx.load(output_path)
+onnx.checker.check_model(converted)
 onnx.save(converted, output_path)
+
+# quantize(
+#     onnx_path=input_path,
+#     output_path=output_path,
+#     quantize_mode="int8",
+#     calibration_data=None,
+#     calibration_method="max",
+#     calibration_eps=["cpu"],
+#     high_precision_dtype="fp32",
+#     direct_io_types=False,
+# )
+
+# converted = onnx.load(output_path)
+# onnx.save(converted, output_path)
 
 # Verify that ModelOpt preserved the original ONNX input/output interface.
 original = onnx.load(input_path)

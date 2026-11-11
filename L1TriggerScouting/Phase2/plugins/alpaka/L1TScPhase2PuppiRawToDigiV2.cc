@@ -171,9 +171,9 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::l1sc {
     }
 
     // check on total number of BX
-    if (nbx_ != kMaxNBX) {
+    if (nbx_ > kMaxNBX) {
       throw cms::Exception("CorruptData")
-          << "Found only " << nbx_ << " in the current orbit, expected " << kMaxNBX << "\n";
+          << "Found " << nbx_ << " in the current orbit, expected at most" << kMaxNBX << "\n";
     }
 
     // ---- one bulk copy per stream into the pinned staging buffer --------------------------
