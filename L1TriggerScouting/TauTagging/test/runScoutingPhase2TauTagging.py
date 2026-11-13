@@ -74,7 +74,7 @@ stream file for PF barrel and one stream file for PF endcap. Hence:
   convenient to then automatically generate the range of stream IDs directly from it. This is convenient also if PF barrel and PF
   endcap are going to be split among multiple streams in the same buBaseDir.
 """
-process.unpacker = cms.EDProducer("l1sc::L1TScPhase2PuppiRawToDigiV2@alpaka",
+process.unpacker = cms.EDProducer("l1sc::L1TScPhase2PuppiRawToDigi@alpaka",
     alpaka = cms.untracked.PSet(
         backend = cms.untracked.string(options.backend)
     ),

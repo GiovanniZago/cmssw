@@ -30,3 +30,7 @@ zz_images
 
 # python
 *ipynb*
+
+# benchmarks
+*logs*
+patatrack-scripts
