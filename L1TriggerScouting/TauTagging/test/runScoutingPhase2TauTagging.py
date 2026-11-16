@@ -5,6 +5,20 @@ process = cms.Process("ScoutingPhase2TauTagging")
 from L1TriggerScouting.TauTagging.options_cff import options, VarParsing
 
 # tracing option
+options.register ("pfBarrelSplitFactor", 
+    1, 
+    VarParsing.VarParsing.multiplicity.singleton,
+    VarParsing.VarParsing.varType.int,
+    "Number of input streams in which a timeslice of barrel PF candidates is split."
+)
+
+options.register ("pfEndcapSplitFactor", 
+    1, 
+    VarParsing.VarParsing.multiplicity.singleton,
+    VarParsing.VarParsing.varType.int,
+    "Number of input streams in which a timeslice of endcap PF candidates is split."
+)
+
 options.register ("tracePerfetto",
     False,
     VarParsing.VarParsing.multiplicity.singleton,
@@ -43,6 +57,13 @@ if options.dump != []:
     
     print("Dumps requested and compatible with pipeline step: ", dump)
 
+# framework setup
+process.load("Configuration.StandardSequences.Accelerators_cff")
+process.options.numberOfThreads = cms.untracked.uint32(options.numThreads)
+process.options.numberOfStreams = cms.untracked.uint32(options.numFwkStreams)
+process.options.numberOfConcurrentLuminosityBlocks = cms.untracked.uint32(1)
+process.maxEvents = cms.untracked.PSet(input=cms.untracked.int32(options.maxEvents))
+
 # common framework options, accelerator support, and DAQ input
 from L1TriggerScouting.Phase2.L1TScPhase2RunScouting_cff import setupPhase2Scouting
 setupPhase2Scouting(process, options)
@@ -54,38 +75,40 @@ process.PyTorchService = cms.Service("PyTorchService")
 process.load( "HLTrigger.Timer.FastTimerService_cfi" )
 process.FastTimerService.printEventSummary = True
 process.FastTimerService.writeJSONSummary = cms.untracked.bool(True)
-process.FastTimerService.jsonFileName = cms.untracked.string(f"Phase2Timing_resources.json")
+process.FastTimerService.jsonFileName = cms.untracked.string(f"resources_runScoutingPhase2TauTagging.json")
 process.FastTimerService.enableTimingPaths = cms.untracked.bool(True)
 process.FastTimerService.enableTimingModules = cms.untracked.bool(True)
 process.FastTimerService.useRealTimeClock = cms.untracked.bool(True)
+
+# report
+process.load("FWCore.MessageService.MessageLogger_cfi")
+process.MessageLogger.cerr.FwkReport.reportEvery = cms.untracked.int32(100)
+process.options.wantSummary = cms.untracked.bool(True)
 
 # define pipeline path
 process.p_pipeline = cms.Path()
 
 # unpacking
-"""
-Remarks on streams unpacker input parameter:
-streams should be a list with each entry is the stream ID of stream files inside one or multiple buBaseDir(s). 
-Since we are working with PF candidates, we care only about PF candidates stream files. The current working setup is one 
-stream file for PF barrel and one stream file for PF endcap. Hence:
-- either one specifies pfBarrelStreamIDs=0 and pfEndcapStreamIDs=1 to get streams = [0, 1]
-- or one just specifies the total number of streams contained in each buBaseDir, which is expressed by buNumStreams. 
-  Usually there is only one buBaseDir containing the stream files for PF barrel and PF endcap. Thus buNumStreams = [2] and it is
-  convenient to then automatically generate the range of stream IDs directly from it. This is convenient also if PF barrel and PF
-  endcap are going to be split among multiple streams in the same buBaseDir.
-"""
 process.unpacker = cms.EDProducer("l1sc::L1TScPhase2PuppiRawToDigi@alpaka",
     alpaka = cms.untracked.PSet(
         backend = cms.untracked.string(options.backend)
     ),
     src = cms.InputTag("rawDataCollector"),
     streams = cms.vuint32(
-        *list(range(options.buNumStreams[0])) # here we assume that buNumStreams[0] corresponds to the number of streams of PF candidates
+        *list(range(options.buNumStreams[0]))
         if options.pfBarrelStreamIDs == [] else options.pfBarrelStreamIDs + options.pfEndcapStreamIDs
     ),
-    splitFactor = cms.uint32(5) # pay a lot of attention to splitfactor
+    splitFactor = cms.uint32(options.pfBarrelSplitFactor + options.pfEndcapSplitFactor) 
 )
 process.p_pipeline += process.unpacker
+
+# check orbits
+process.check_orbits = cms.EDFilter("GoodOrbitNBxSelector", 
+    unpackers=cms.VInputTag(),
+    unpackersAlpaka=cms.VInputTag(cms.InputTag("unpacker")),
+    nbxMin=cms.uint32(3564 * options.timeslices // options.tmuxPeriod)
+)
+process.p_pipeline += process.check_orbits
 
 # clustering
 process.load(
@@ -157,7 +180,7 @@ if "soft_tau_outputs" in dump:
 process.end = cms.EndPath()
 
 process.out = cms.OutputModule("OrbitNanoAODOutputModule",
-    fileName = cms.untracked.string("softTauOrbitNano-L1PF_17_0_X_on_pre2-17_0_X-new-unpacker.root"),
+    fileName = cms.untracked.string("tau_tagging.root"),
     SelectEvents = cms.untracked.PSet(SelectEvents = cms.vstring()),
     outputCommands = cms.untracked.vstring("drop *", "keep l1ScoutingRun3OrbitFlatTable_*_*_*"),
 )
