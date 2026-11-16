@@ -99,7 +99,7 @@ process.unpacker = cms.EDProducer("l1sc::L1TScPhase2PuppiRawToDigi@alpaka",
         *list(range(options.buNumStreams[0])) # here we assume that buNumStreams[0] corresponds to the number of streams of PF candidates
         if options.pfBarrelStreamIDs == [] else options.pfBarrelStreamIDs + options.pfEndcapStreamIDs
     ),
-    splitFactor = cms.uint32(45) # pay a lot of attention to splitfactor
+    splitFactor = cms.uint32(5) # pay a lot of attention to splitfactor
 )
 process.p_pipeline += process.unpacker
 

@@ -213,7 +213,7 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::l1sc::kernels {
         queue, grid, PadPuppiPerBxKernel{}, puppi.const_view(), bx_lookup.const_view(), puppi_padded.view(), nele);
   }
 
-  // ---------------- V2 additions (see L1TScPhase2PuppiRawToDigiV2.cc) ---------------------
+  // ---------------- Kernels for V2 unpacker (see L1TScPhase2PuppiRawToDigiV2.cc) ---------------------
 
   namespace {
     // Extract one candidate from a 64-bit word into the SoA columns; identical bit windows
