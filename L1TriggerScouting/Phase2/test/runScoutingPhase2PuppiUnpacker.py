@@ -1,95 +1,75 @@
 # define process
 import FWCore.ParameterSet.Config as cms
-process = cms.Process("ScoutingPhase2Unpackers")
+process = cms.Process("ScoutingPhase2PuppiUnpacker")
 
 # import L1 scouting options
 from L1TriggerScouting.Phase2.options_cff import options, VarParsing
 
 # extra options
-options.register ("reportEvery",
-    100, # default value
+options.register ("puppiSplitFactor", 
+    1, 
     VarParsing.VarParsing.multiplicity.singleton,
-    VarParsing.VarParsing.varType.int, 
-    "Print message after the specified number of events (proper events in this case)"
-)
-
-options.register ("unpackerType",
-    "legacy", # "legacy" (default) or "alpaka"
-    VarParsing.VarParsing.multiplicity.singleton,
-    VarParsing.VarParsing.varType.string, 
-    "Specify which flavor of unpacker to use"
+    VarParsing.VarParsing.varType.int,
+    "Number of input streams in which a timeslice of Puppi candidates is split."
 )
 
 # parse options
 options.parseArguments()
 
-# check options
-if options.unpackerType not in ["legacy", "alpaka", "alpaka-v2"]:
-    raise ValueError("unpackerType must be either legacy, alpaka or alpaka-v2")
-
-if options.unpackerType == "legacy" and options.backend == "cuda_async":
-    raise ValueError("Legacy unpacker can be run only on serial_sync backend")
+# framework setup
+process.load("Configuration.StandardSequences.Accelerators_cff")
+process.options.numberOfThreads = cms.untracked.uint32(options.numThreads)
+process.options.numberOfStreams = cms.untracked.uint32(options.numFwkStreams)
+process.options.numberOfConcurrentLuminosityBlocks = cms.untracked.uint32(1)
+process.maxEvents = cms.untracked.PSet(input=cms.untracked.int32(options.maxEvents))
 
 # setup DAQ director and DAQ source
 from L1TriggerScouting.Phase2.L1TScPhase2RunScouting_cff import setupPhase2Scouting
 setupPhase2Scouting(process, options)
+process.source.fileListLoopMode = cms.untracked.bool(True)
 
 # timing
 process.load( "HLTrigger.Timer.FastTimerService_cfi" )
-process.FastTimerService.printEventSummary = True
+process.FastTimerService.printEventSummary = cms.untracked.bool(True)
 process.FastTimerService.writeJSONSummary = cms.untracked.bool(True)
-process.FastTimerService.jsonFileName = cms.untracked.string(f"Phase2Timing_resources.json")
+process.FastTimerService.jsonFileName = cms.untracked.string(f"resources_runScoutingPhase2PuppiUnpacker.json")
 process.FastTimerService.enableTimingPaths = cms.untracked.bool(True)
 process.FastTimerService.enableTimingModules = cms.untracked.bool(True)
 process.FastTimerService.useRealTimeClock = cms.untracked.bool(True)
 
+# report
+process.load("FWCore.MessageService.MessageLogger_cfi")
+process.MessageLogger.cerr.FwkReport.reportEvery = cms.untracked.int32(100)
+process.options.wantSummary = cms.untracked.bool(True)
+
 # define pipeline path
 process.p_unpacking = cms.Path()
 
-# define unpacker
-"""
-Pay attention that the splitFactor parameter here has a different meaning in the legacy unpacker wrt the alpaka unpacker.
-I think that the correct implementation of the split factor is on the alpaka unpacker, thus the correct value should be 1.
-"""
-if options.unpackerType == "legacy":
-    process.unpacker = cms.EDProducer("ScPhase2PuppiRawToDigi", 
-        src = cms.InputTag("rawDataCollector"),
-        fedIDs = cms.vuint32(
-            *list(range(options.buNumStreams[0])) # here we assume that buNumStreams[0] corresponds to the number of streams of PF candidates
-            if options.pfBarrelStreamIDs == [] else options.pfBarrelStreamIDs + options.pfEndcapStreamIDs
-        ), 
-        splitFactor = cms.uint32(2) 
-    )
-
-elif options.unpackerType == "alpaka":
-    process.unpacker = cms.EDProducer("l1sc::L1TScPhase2PuppiRawToDigi@alpaka",
-        alpaka = cms.untracked.PSet(
-            backend = cms.untracked.string(options.backend)
-        ),
-        src = cms.InputTag("rawDataCollector"),
-        streams = cms.vuint32(
-            *list(range(options.buNumStreams[0])) # here we assume that buNumStreams[0] corresponds to the number of streams of PF candidates
-            if options.pfBarrelStreamIDs == [] else options.pfBarrelStreamIDs + options.pfEndcapStreamIDs
-        ),
-        splitFactor = cms.uint32(2)
-    )
-
-elif options.unpackerType == "alpaka-v2":
-    process.unpacker = cms.EDProducer("l1sc::L1TScPhase2PuppiRawToDigiV2@alpaka",
-        alpaka = cms.untracked.PSet(
-            backend = cms.untracked.string(options.backend)
-        ),
-        src = cms.InputTag("rawDataCollector"),
-        streams = cms.vuint32(
-            *list(range(options.buNumStreams[0])) # here we assume that buNumStreams[0] corresponds to the number of streams of PF candidates
-            if options.pfBarrelStreamIDs == [] else options.pfBarrelStreamIDs + options.pfEndcapStreamIDs
-        ),
-        splitFactor = cms.uint32(2)
-    )
+# unpacker
+process.unpacker = cms.EDProducer("l1sc::L1TScPhase2PuppiRawToDigi@alpaka",
+    alpaka = cms.untracked.PSet(
+        backend = cms.untracked.string(options.backend)
+    ),
+    src = cms.InputTag("rawDataCollector"),
+    streams = cms.vuint32(
+        *list(range(options.buNumStreams[0])) 
+        if options.puppiStreamIDs == [] else options.puppiStreamIDs
+    ),
+    splitFactor = cms.uint32(options.puppiSplitFactor)
+)
 
 process.p_unpacking += process.unpacker
 
+# check orbits
+process.check_orbits = cms.EDFilter("GoodOrbitNBxSelector", 
+    unpackers=cms.VInputTag(),
+    unpackersAlpaka=cms.VInputTag(cms.InputTag("unpacker")),
+    nbxMin=cms.uint32(3564 * options.timeslices // options.tmuxPeriod)
+)
+
+process.p_unpacking += process.check_orbits
+
+# schedule 
 process.schedule = cms.Schedule(
     process.p_unpacking
 )
-
