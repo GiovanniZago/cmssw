@@ -33,7 +33,6 @@ process.maxEvents = cms.untracked.PSet(input=cms.untracked.int32(options.maxEven
 # setup DAQ director and DAQ source
 from L1TriggerScouting.Phase2.L1TScPhase2RunScouting_cff import setupPhase2Scouting
 setupPhase2Scouting(process, options)
-process.source.fileListLoopMode = cms.untracked.bool(True)
 
 # timing
 process.load( "HLTrigger.Timer.FastTimerService_cfi" )
