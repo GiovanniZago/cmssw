@@ -54,7 +54,7 @@ def setupPhase2Scouting(process, options):
         fileListMode = cms.untracked.bool(options.broker == "none"),
         fileNames = cms.untracked.vstring(
             # buDirs[0] + "/" + "run%06d_ls%04d_index%012d_stream00.raw" % (options.runNumber, options.lumiNumber, 1), # 8194
-            buDirs[0] + "/" + "run%06d_ls%04d_index%06d_stream00.raw" % (options.runNumber, options.lumiNumber, 1),
+            buDirs[0] + "/" + "run%06d_ls%04d_index%012d_stream00.raw" % (options.runNumber, options.lumiNumber, 1),
         ),
     )
     os.system("touch " + buDirs[0] + "/" + "fu.lock")

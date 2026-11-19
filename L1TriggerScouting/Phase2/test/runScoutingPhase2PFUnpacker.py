@@ -43,9 +43,21 @@ process.FastTimerService.enableTimingPaths = cms.untracked.bool(True)
 process.FastTimerService.enableTimingModules = cms.untracked.bool(True)
 process.FastTimerService.useRealTimeClock = cms.untracked.bool(True)
 
+# throughput
+process.ThroughputService = cms.Service("ThroughputService",
+    enableDQM = cms.untracked.bool(False),
+    eventRange = cms.untracked.uint32(options.maxEvents),
+    eventResolution = cms.untracked.uint32(10),
+    printEventSummary = cms.untracked.bool(True)
+)
+
 # report
 process.load("FWCore.MessageService.MessageLogger_cfi")
 process.MessageLogger.cerr.FwkReport.reportEvery = cms.untracked.int32(100)
+process.MessageLogger.cerr.threshold = cms.untracked.string("INFO")
+process.MessageLogger.cerr.ThroughputService = cms.untracked.PSet(
+    limit = cms.untracked.int32(-1)
+)
 process.options.wantSummary = cms.untracked.bool(True)
 
 # define pipeline path
