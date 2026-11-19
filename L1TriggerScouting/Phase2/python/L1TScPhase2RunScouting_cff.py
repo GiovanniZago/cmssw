@@ -48,12 +48,13 @@ def setupPhase2Scouting(process, options):
         useL1EventID = cms.untracked.bool(False),
         eventChunkBlock = cms.untracked.uint32(64), # Keep each read(2) request well below Linux's per-call transfer limit.
         eventChunkSize = cms.untracked.uint32(8 * 1024), 
-        maxChunkSize = cms.untracked.uint32(16 * 1024),
+        maxChunkSize = cms.untracked.uint32(128 * 1024),
         numBuffers = cms.untracked.uint32(4),
         maxBufferedFiles = cms.untracked.uint32(4),
         fileListMode = cms.untracked.bool(options.broker == "none"),
         fileNames = cms.untracked.vstring(
-            buDirs[0] + "/" + "run%06d_ls%04d_index%012d_stream00.raw" % (options.runNumber, options.lumiNumber, 8194),
+            # buDirs[0] + "/" + "run%06d_ls%04d_index%012d_stream00.raw" % (options.runNumber, options.lumiNumber, 1), # 8194
+            buDirs[0] + "/" + "run%06d_ls%04d_index%06d_stream00.raw" % (options.runNumber, options.lumiNumber, 1),
         ),
     )
     os.system("touch " + buDirs[0] + "/" + "fu.lock")
