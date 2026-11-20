@@ -41,22 +41,39 @@ def setupPhase2Scouting(process, options):
     for directory in [fuDir, options.fuBaseDir] + buDirs + options.buBaseDir:
         os.makedirs(directory, exist_ok=True)
 
+    # process.source = cms.Source("DAQSource",
+    #     testing = cms.untracked.bool(True),
+    #     dataMode = cms.untracked.string(options.daqSourceMode),
+    #     verifyChecksum = cms.untracked.bool(True),
+    #     useL1EventID = cms.untracked.bool(False),
+    #     eventChunkBlock = cms.untracked.uint32(64), # Keep each read(2) request well below Linux's per-call transfer limit.
+    #     eventChunkSize = cms.untracked.uint32(8 * 1024), 
+    #     maxChunkSize = cms.untracked.uint32(128 * 1024),
+    #     numBuffers = cms.untracked.uint32(4),
+    #     maxBufferedFiles = cms.untracked.uint32(4),
+    #     fileListMode = cms.untracked.bool(options.broker == "none"),
+    #     fileNames = cms.untracked.vstring(
+    #         # buDirs[0] + "/" + "run%06d_ls%04d_index%012d_stream00.raw" % (options.runNumber, options.lumiNumber, 1), # 8194
+    #         buDirs[0] + "/" + "run%06d_ls%04d_index%012d_stream00.raw" % (options.runNumber, options.lumiNumber, 1),
+    #     ),
+    # )
     process.source = cms.Source("DAQSource",
-        testing = cms.untracked.bool(True),
-        dataMode = cms.untracked.string(options.daqSourceMode),
-        verifyChecksum = cms.untracked.bool(True),
-        useL1EventID = cms.untracked.bool(False),
-        eventChunkBlock = cms.untracked.uint32(64), # Keep each read(2) request well below Linux's per-call transfer limit.
-        eventChunkSize = cms.untracked.uint32(8 * 1024), 
-        maxChunkSize = cms.untracked.uint32(128 * 1024),
-        numBuffers = cms.untracked.uint32(4),
-        maxBufferedFiles = cms.untracked.uint32(4),
-        fileListMode = cms.untracked.bool(options.broker == "none"),
-        fileNames = cms.untracked.vstring(
-            # buDirs[0] + "/" + "run%06d_ls%04d_index%012d_stream00.raw" % (options.runNumber, options.lumiNumber, 1), # 8194
-            buDirs[0] + "/" + "run%06d_ls%04d_index%012d_stream00.raw" % (options.runNumber, options.lumiNumber, 1),
-        ),
+    testing = cms.untracked.bool(True),
+    dataMode = cms.untracked.string(options.daqSourceMode),
+    verifyChecksum = cms.untracked.bool(True),
+    useL1EventID = cms.untracked.bool(False),
+    eventChunkBlock = cms.untracked.uint32(2 * 1024),
+    eventChunkSize = cms.untracked.uint32(2 * 1024),
+    maxChunkSize = cms.untracked.uint32(4 * 1024),
+    numBuffers = cms.untracked.uint32(4),
+    maxBufferedFiles = cms.untracked.uint32(4),
+    fileListMode = cms.untracked.bool(options.broker == "none"),
+    fileNames = cms.untracked.vstring(
+        # buDirs[0] + "/" + "run%06d_ls%04d_index%06d_stream00.raw" % (options.runNumber, options.lumiNumber, 1),
+        buDirs[0] + "/" + "run%06d_ls%04d_index%012d_stream00.raw" % (options.runNumber, options.lumiNumber, 1),
     )
+)
+
     os.system("touch " + buDirs[0] + "/" + "fu.lock")
     
     return process
